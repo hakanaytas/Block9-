@@ -1,0 +1,2322 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Block 9</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Baloo+2:wght@600;700;800&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+  /* ===================== ROOT & RESET ===================== */
+  *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color: transparent; user-select:none; }
+  html, body{
+    height:100%; overflow:hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: #0d0e1f;
+    touch-action: manipulation;
+    overscroll-behavior: none;
+  }
+  #gameCanvas{ position:fixed; inset:0; display:block; width:100%; height:100%; }
+
+  /* ===================== HUD ===================== */
+  #hud{
+    position: fixed; top: max(14px, env(safe-area-inset-top)); left:0; right:0;
+    display:flex; flex-direction:column; align-items:center;
+    pointer-events:none; z-index:5;
+  }
+  #scoreValue{
+    font-size: 50px; font-weight:800; color:#fff;
+    text-shadow: 0 3px 12px rgba(0,0,0,0.3);
+    transition: transform .15s ease;
+  }
+  #scoreValue.pulse{ transform: scale(1.25); }
+  #comboWrap{
+    margin-top:2px; display:flex; align-items:center; gap:6px;
+    background: rgba(255,255,255,0.14); backdrop-filter: blur(6px);
+    padding:4px 12px; border-radius:20px; opacity:0; transform: translateY(-6px) scale(0.8);
+    transition: opacity .18s ease, transform .18s ease;
+  }
+  #comboWrap.show{ opacity:1; transform: translateY(0) scale(1); }
+  #comboWrap span{ color:#ffd23f; font-weight:800; font-size:15px; }
+
+  .top-badge{
+    position: fixed; top: max(18px, env(safe-area-inset-top)); z-index:26;
+    background: linear-gradient(180deg, rgba(255,255,255,0.32), rgba(255,255,255,0.1));
+    backdrop-filter: blur(8px);
+    color:#fff; border:1.5px solid rgba(255,255,255,0.35); border-radius:16px; font-weight:800;
+    display:flex; align-items:center; justify-content:center; gap:4px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.5);
+    font-family:'Nunito', sans-serif;
+  }
+  #bestBadge{
+    right:16px; padding:7px 12px; font-size:13px; color:#5c3400;
+    background: linear-gradient(180deg,#fff4d6,#ffdb8a); border-color:#e8a93f;
+    box-shadow: 0 4px 0 #c9860f, 0 8px 16px rgba(180,110,10,0.3), inset 0 1px 0 rgba(255,255,255,0.7);
+  }
+  #coinBadge{
+    right:16px; top: max(62px, calc(env(safe-area-inset-top) + 48px)); padding:6px 12px; font-size:13px; color:#5c3400;
+    background: linear-gradient(180deg,#fff4d6,#ffdb8a); border-color:#e8a93f;
+    box-shadow: 0 4px 0 #c9860f, 0 8px 16px rgba(180,110,10,0.3), inset 0 1px 0 rgba(255,255,255,0.7);
+  }
+  #menuBtn{ left:16px; width:42px; height:42px; font-size:17px; cursor:pointer; }
+  #soundBtn{ left:66px; width:42px; height:42px; font-size:16px; cursor:pointer; }
+  /* Menü/skor ekranı açıkken duraklatma HUD'u gizlensin, kart içindeki kendi coin/gem gösterimi öne çıksın */
+  body:has(.overlay:not(.hidden)) #menuBtn,
+  body:has(.overlay:not(.hidden)) #soundBtn,
+  body:has(.overlay:not(.hidden)) #bestBadge,
+  body:has(.overlay:not(.hidden)) #coinBadge{ opacity:0; pointer-events:none; }
+  #menuBtn, #soundBtn, #bestBadge, #coinBadge{ transition: opacity .2s ease; }
+
+  /* ---- Menü kartı içi premium para göstergesi (Coin sol / Gem sağ) ---- */
+  .curRow{ display:flex; align-items:center; justify-content:space-between; margin: -6px 0 14px; gap:8px; }
+  .curPill{
+    display:flex; align-items:center; gap:6px; padding:7px 8px 7px 6px; border-radius:16px; font-weight:900; font-size:13.5px;
+    font-family:'Nunito', sans-serif; box-shadow: 0 3px 0 rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.6);
+  }
+  .curPill .curIco{ width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; box-shadow: inset 0 -2px 3px rgba(0,0,0,0.15), inset 0 2px 2px rgba(255,255,255,0.5); }
+  .curPill.coinPill{ background: linear-gradient(180deg,#fff4d6,#ffcf6e); color:#7a4600; border:1.5px solid #e8a93f; }
+  .curPill.coinPill .curIco{ background: radial-gradient(circle at 35% 30%, #fff2b0, #ffb300 70%); }
+  .curPill.gemPill{ background: linear-gradient(180deg,#eee0ff,#c9a4ff); color:#3c1a66; border:1.5px solid #9a63e8; }
+  .curPill.gemPill .curIco{ background: radial-gradient(circle at 35% 30%, #f0e6ff, #8a4fe0 70%); }
+  .addCoinBtn{
+    width:20px; height:20px; border-radius:50%; background:linear-gradient(180deg,#8bec8b,#2f9e4f);
+    color:#fff; font-weight:900; font-size:13px; display:flex; align-items:center; justify-content:center;
+    box-shadow:0 2px 0 #1f7a38; border:1px solid rgba(255,255,255,0.6); cursor:pointer; flex-shrink:0;
+  }
+
+  #hint{
+    position: fixed; bottom: max(40px, env(safe-area-inset-bottom) + 24px);
+    left:0; right:0; text-align:center; color: rgba(255,255,255,0.85);
+    font-size:14px; font-weight:700; pointer-events:none; z-index:5;
+    animation: hint-bounce 1.4s ease-in-out infinite;
+  }
+  @keyframes hint-bounce{ 0%,100%{transform:translateY(0);opacity:.85;} 50%{transform:translateY(-8px);opacity:1;} }
+
+  #fpsCounter{
+    position:fixed; bottom:8px; left:8px; color:rgba(255,255,255,0.5);
+    font-size:11px; font-weight:700; z-index:5; pointer-events:none;
+  }
+
+  /* Floating "PERFECT" / combo text (DOM based) */
+  .floatText{
+    position: fixed; left:50%; transform: translateX(-50%);
+    font-weight:900; letter-spacing:1px; pointer-events:none; z-index:15;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.4);
+    animation: floatUp 0.9s ease-out forwards;
+  }
+  @keyframes floatUp{
+    0%{ opacity:0; transform: translateX(-50%) translateY(10px) scale(0.7); }
+    15%{ opacity:1; transform: translateX(-50%) translateY(-6px) scale(1.15); }
+    30%{ transform: translateX(-50%) translateY(-10px) scale(1); }
+    100%{ opacity:0; transform: translateX(-50%) translateY(-70px) scale(1); }
+  }
+
+  .whiteFlash{
+    position:fixed; inset:0; background:#fff; pointer-events:none; z-index:12;
+    opacity:0; animation: flashFade 0.28s ease-out forwards;
+  }
+  @keyframes flashFade{ 0%{opacity:0.55;} 100%{opacity:0;} }
+
+  .toast{
+    position: fixed; top: 90px; left:50%; transform: translateX(-50%);
+    background: rgba(20,22,46,0.92); color:#fff; padding:12px 18px; border-radius:16px;
+    font-size:13px; font-weight:700; z-index:30; display:flex; align-items:center; gap:10px;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.3);
+    animation: toastIn .3s ease, toastOut .3s ease 2.4s forwards;
+  }
+  @keyframes toastIn{ 0%{opacity:0; transform:translateX(-50%) translateY(-14px);} 100%{opacity:1; transform:translateX(-50%) translateY(0);} }
+  @keyframes toastOut{ 0%{opacity:1;} 100%{opacity:0; transform:translateX(-50%) translateY(-14px);} }
+
+  /* ===================== OVERLAY / SCREENS — PREMIUM SKY UI ===================== */
+  .overlay{
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    z-index:20; padding:18px; overflow:hidden;
+    background:
+      radial-gradient(120% 70% at 50% 0%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0) 55%),
+      linear-gradient(180deg, #8fd0ff 0%, #a9def5 22%, #cdeeff 46%, #eaf7ff 72%, #fff6e6 100%);
+  }
+  .hidden{ display:none !important; }
+
+  /* ---- Dekoratif menü arka planı: gökyüzü / dağ / bulut / parçacık katmanları ---- */
+  .menu-scene{ position:absolute; inset:0; z-index:0; overflow:hidden; pointer-events:none; }
+  .menu-scene .zoomLayer{ position:absolute; inset:-4%; animation: menuZoom 22s ease-in-out infinite; }
+
+  .glare{ position:absolute; border-radius:50%; filter:blur(2px); opacity:.55; mix-blend-mode:screen; }
+  .glare.g1{ width:260px; height:260px; top:-60px; left:-40px; background:radial-gradient(circle,#fff,rgba(255,255,255,0) 70%); animation: glarePulse 6s ease-in-out infinite; }
+  .glare.g2{ width:180px; height:180px; top:8%; right:-20px; background:radial-gradient(circle,#fff6d8,rgba(255,246,216,0) 70%); animation: glarePulse 7.5s ease-in-out infinite 1.2s; }
+
+  .mountain{ position:absolute; bottom:0; left:0; width:100%; height:46%; }
+  .mountain svg{ width:100%; height:100%; display:block; }
+  .mountain.back{ opacity:.55; }
+  .mountain.front{ opacity:.85; }
+
+  .cloud{
+    position:absolute; background:#fff; border-radius:100px; opacity:.85;
+    box-shadow: 40px 6px 0 -6px #fff, -35px 10px 0 -8px #fff, 70px -4px 0 -10px rgba(255,255,255,0.8);
+    animation-name: cloudDrift; animation-timing-function: linear; animation-iteration-count: infinite;
+  }
+  .cloud.c1{ width:110px; height:34px; top:9%;  left:-20%; animation-duration: 46s; opacity:.95; }
+  .cloud.c2{ width:80px;  height:26px; top:16%; left:-40%; animation-duration: 60s; animation-delay:-14s; opacity:.75; }
+  .cloud.c3{ width:140px; height:40px; top:5%;  left:-60%; animation-duration: 74s; animation-delay:-30s; opacity:.65; }
+  .cloud.c4{ width:70px;  height:24px; top:22%; left:-15%; animation-duration: 38s; animation-delay:-8s;  opacity:.9; }
+  @keyframes cloudDrift{ 0%{ transform:translateX(0); } 100%{ transform:translateX(160vw); } }
+  @keyframes menuZoom{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.045); } }
+  @keyframes glarePulse{ 0%,100%{ opacity:.3; } 50%{ opacity:.65; } }
+
+  .motes{ position:absolute; inset:0; }
+  .mote{
+    position:absolute; bottom:-6%; width:5px; height:5px; border-radius:50%;
+    background: rgba(255,255,255,0.85); box-shadow:0 0 6px 1px rgba(255,255,255,0.6);
+    animation-name: moteRise; animation-timing-function: ease-in; animation-iteration-count: infinite;
+  }
+  .mote:nth-child(1){ left:8%;  animation-duration:9s;  animation-delay:0s; }
+  .mote:nth-child(2){ left:20%; animation-duration:12s; animation-delay:1.4s; width:3px; height:3px;}
+  .mote:nth-child(3){ left:34%; animation-duration:10s; animation-delay:2.8s; }
+  .mote:nth-child(4){ left:48%; animation-duration:14s; animation-delay:.6s; width:4px; height:4px;}
+  .mote:nth-child(5){ left:60%; animation-duration:8s;  animation-delay:3.6s; }
+  .mote:nth-child(6){ left:72%; animation-duration:13s; animation-delay:1.9s; width:3px; height:3px;}
+  .mote:nth-child(7){ left:84%; animation-duration:11s; animation-delay:.2s; }
+  .mote:nth-child(8){ left:92%; animation-duration:9.5s; animation-delay:2.4s; width:4px; height:4px;}
+  @keyframes moteRise{
+    0%{ transform:translateY(0) translateX(0); opacity:0; }
+    10%{ opacity:.9; }
+    50%{ transform:translateY(-48vh) translateX(12px); }
+    90%{ opacity:.5; }
+    100%{ transform:translateY(-92vh) translateX(-8px); opacity:0; }
+  }
+
+  .card{
+    position:relative; z-index:2;
+    background: linear-gradient(180deg, rgba(255,252,244,0.96) 0%, rgba(255,240,214,0.94) 100%);
+    border:4px solid #7a3510; border-radius: 42px 42px 46px 46px / 46px 46px 42px 42px;
+    padding:26px 22px 22px; max-width:380px; width:100%;
+    max-height: 88vh; overflow-y:auto;
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,0.9),
+      inset 0 -18px 30px -20px rgba(122,53,16,0.18),
+      0 10px 0 rgba(90,40,10,0.28), 0 28px 50px rgba(40,15,0,0.4);
+    backdrop-filter: blur(2px);
+    animation: cardIn .4s cubic-bezier(.2,.9,.3,1.25);
+  }
+  @keyframes cardIn{ 0%{transform:scale(0.86) translateY(18px); opacity:0;} 100%{transform:scale(1) translateY(0); opacity:1;} }
+
+  /* ---- Logo (BLOCK 9) ---- */
+  .logoWrap{ text-align:center; margin: -4px 0 6px; animation: logoDrop .6s cubic-bezier(.25,.9,.3,1.3); }
+  @keyframes logoDrop{ 0%{ transform:translateY(-60px) scale(.9); opacity:0; } 100%{ transform:translateY(0) scale(1); opacity:1; } }
+  .logoTitle{
+    font-family:'Baloo 2', 'Fredoka', sans-serif; font-weight:800; font-size:40px; letter-spacing:1px;
+    display:inline-block; color:#ffb347;
+    background: linear-gradient(180deg,#ffe08a 0%, #ffb23f 45%, #e2701a 100%);
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+    -webkit-text-stroke: 2.5px #7a3208;
+    filter: drop-shadow(0 3px 0 #7a3208) drop-shadow(0 7px 0 #5c2504) drop-shadow(0 14px 18px rgba(90,40,10,0.45));
+    animation: logoBreathe 3.2s ease-in-out infinite;
+    line-height:1.05;
+  }
+  @keyframes logoBreathe{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.035); } }
+  .logoSub{
+    font-family:'Nunito', sans-serif; font-weight:800; font-size:12.5px; letter-spacing:1.5px; text-transform:uppercase;
+    color:#a9784a; margin-top:6px; opacity:.9;
+  }
+
+  .card h1{
+    font-family:'Fredoka', -apple-system, sans-serif; font-weight:700; font-size:29px; letter-spacing:.5px;
+    color:#fff5db; -webkit-text-stroke: 3px #6b330f;
+    text-shadow: 0 4px 0 #6b330f, 0 8px 16px rgba(90,40,10,0.3);
+    margin-bottom:4px; text-align:center;
+  }
+  .card h2{ font-family:'Fredoka', sans-serif; font-size:19px; color:#5c2e0f; text-align:center; margin-bottom:2px; }
+  .subtitle{ font-size:13px; color:#a9784a; margin-bottom:16px; font-weight:600; text-align:center; }
+
+  /* ---- Sıralı giriş animasyonu (bounce fade scale) ---- */
+  @keyframes btnIn{
+    0%{ opacity:0; transform: translateY(16px) scale(.82); }
+    60%{ opacity:1; transform: translateY(-3px) scale(1.03); }
+    100%{ opacity:1; transform: translateY(0) scale(1); }
+  }
+  .menu-anim > *{ animation: btnIn .5s cubic-bezier(.25,.9,.3,1.3) backwards; }
+  .menu-anim > *:nth-child(1){ animation-delay:.05s; }
+  .menu-anim > *:nth-child(2){ animation-delay:.12s; }
+  .menu-anim > *:nth-child(3){ animation-delay:.19s; }
+  .menu-anim > *:nth-child(4){ animation-delay:.26s; }
+  .menu-anim > *:nth-child(5){ animation-delay:.33s; }
+  .menu-anim > *:nth-child(6){ animation-delay:.40s; }
+  .menu-anim > *:nth-child(7){ animation-delay:.47s; }
+
+  .screen-header{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .back-btn{
+    width:34px; height:34px; border-radius:12px; border:2px solid #7a3510; background:#ffe0ad; color:#5c2e0f;
+    font-size:16px; cursor:pointer; flex-shrink:0; font-weight:800;
+  }
+  .screen-header h2{ flex:1; text-align:left; margin:0; }
+
+  .howto{ background:#fff3da; border:2px solid #f2d9ae; border-radius:16px; padding:14px 16px; margin-bottom:18px; text-align:left; }
+  .howto-row{ display:flex; align-items:center; gap:10px; font-size:13px; color:#6b3f18; font-weight:600; margin-bottom:8px; }
+  .howto-row:last-child{ margin-bottom:0; }
+  .howto-emoji{ font-size:18px; width:22px; text-align:center; flex-shrink:0; }
+
+  .big-btn{
+    width:100%; border:3px solid #7a3510; border-radius:26px; padding:16px 18px; font-size:16.5px; font-weight:700;
+    font-family:'Fredoka', sans-serif; letter-spacing:.4px;
+    color:#5c2e0f; text-shadow:0 1px 0 rgba(255,255,255,0.35);
+    background: linear-gradient(180deg, #ffe38a 0%, #ffbb47 46%, #ff8a3d 100%);
+    box-shadow: 0 6px 0 #b34d16, 0 14px 26px rgba(179,77,22,0.38), inset 0 0 0 1.5px rgba(255,255,255,0.25);
+    cursor:pointer; transition: transform .12s ease, box-shadow .12s ease, filter .12s ease; margin-bottom:11px;
+    position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; gap:8px;
+  }
+  .big-btn::before{
+    content:''; position:absolute; top:3px; left:8%; width:84%; height:38%;
+    background:rgba(255,255,255,0.5); border-radius:50%; filter:blur(3px); pointer-events:none;
+  }
+  .big-btn::after{
+    content:''; position:absolute; inset:-2px; border-radius:inherit; pointer-events:none;
+    box-shadow: 0 0 0 0 rgba(255,197,89,0); transition: box-shadow .16s ease;
+  }
+  .big-btn:hover{ transform: translateY(-2px) scale(1.025); filter:brightness(1.05); }
+  .big-btn:hover::after{ box-shadow: 0 0 0 4px rgba(255,197,89,0.45), 0 0 18px 4px rgba(255,166,53,0.5); }
+  .big-btn:active{ transform: translateY(3px) scale(.98); box-shadow: 0 2px 0 #b34d16, 0 6px 14px rgba(179,77,22,0.32); filter:brightness(.97); }
+  .big-btn.secondary{ background: linear-gradient(180deg,#fff3da,#ffdfa8); color:#7a4a1e; box-shadow: 0 5px 0 #d3a15a, 0 10px 18px rgba(90,40,10,0.18); }
+  .big-btn.small{ padding:11px; font-size:13px; }
+  .big-btn .btnIco{ font-size:19px; filter: drop-shadow(0 1px 0 rgba(255,255,255,0.4)); }
+  .big-btn.gold-glow{ background: linear-gradient(180deg,#fff2c0,#ffce55 45%,#ff9d1f 100%); animation: shopGlow 2.4s ease-in-out infinite; }
+  @keyframes shopGlow{ 0%,100%{ box-shadow: 0 6px 0 #b3760f, 0 14px 26px rgba(255,170,20,0.35), inset 0 0 0 1.5px rgba(255,255,255,0.3);} 50%{ box-shadow: 0 6px 0 #b3760f, 0 16px 34px rgba(255,196,60,0.6), inset 0 0 0 1.5px rgba(255,255,255,0.5);} }
+  .new-tag{
+    position:absolute; top:-8px; right:10px; background:#ff3b5c; color:#fff; font-size:9.5px; font-weight:900;
+    padding:3px 7px; border-radius:8px; letter-spacing:.5px; box-shadow:0 3px 6px rgba(200,20,50,0.4);
+    border:1.5px solid #fff; transform:rotate(6deg);
+  }
+  .notif-dot{
+    position:absolute; top:-6px; right:-6px; width:20px; height:20px; border-radius:50%;
+    background:#ff3b5c; color:#fff; font-size:10.5px; font-weight:900; display:flex; align-items:center; justify-content:center;
+    border:2px solid #fff; box-shadow:0 2px 5px rgba(200,20,50,0.5);
+  }
+
+  .menu-grid{ display:grid; grid-template-columns: repeat(3,1fr); gap:8px; margin-top:12px; }
+  .menu-tile{
+    background: linear-gradient(180deg,#fff3da,#ffdfa8); border:2.5px solid #d3a15a; border-radius:18px;
+    padding:12px 4px 10px; text-align:center; cursor:pointer; position:relative; overflow:hidden;
+    box-shadow: 0 3px 0 #d3a15a, inset 0 0 0 1px rgba(255,255,255,0.4); transition: transform .12s ease, box-shadow .12s ease;
+  }
+  .menu-tile::before{ content:''; position:absolute; top:2px; left:10%; width:80%; height:30%; background:rgba(255,255,255,0.5); border-radius:50%; filter:blur(2px); }
+  .menu-tile:hover{ transform: translateY(-1px) scale(1.04); }
+  .menu-tile:active{ transform:translateY(2px); box-shadow:0 1px 0 #d3a15a; }
+  .menu-tile .ico{
+    font-size:19px; display:flex; align-items:center; justify-content:center; margin:0 auto 5px;
+    width:34px; height:34px; border-radius:50%;
+    background: linear-gradient(180deg,#ffe38a,#ffab54); box-shadow: inset 0 -3px 4px rgba(122,53,16,0.18), inset 0 2px 2px rgba(255,255,255,0.6);
+  }
+  .menu-tile .lbl{ font-size:10.5px; font-weight:800; color:#5c2e0f; }
+
+  /* İkincil özellikler (Mağaza, Temalar, Başarımlar, vb.) için Ayarlar ekranındaki küçük ızgara */
+  .mini-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:10px; }
+  .mini-tile{
+    background: linear-gradient(180deg,#fff3da,#ffdfa8); border:2px solid #d3a15a; border-radius:16px;
+    padding:10px 6px; text-align:center; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:2px;
+    box-shadow: 0 3px 0 #d3a15a; transition: transform .1s ease, box-shadow .1s ease;
+  }
+  .mini-tile:hover{ transform: translateY(-1px) scale(1.03); }
+  .mini-tile:active{ transform:translateY(2px); box-shadow:0 1px 0 #d3a15a; }
+  .mini-tile .ico{ font-size:18px; }
+  .mini-tile .lbl{ font-size:10.5px; font-weight:800; color:#6b3f18; }
+
+  .stat-line{ display:flex; justify-content:space-between; padding:9px 0; font-size:13.5px; color:#6b3f18; font-weight:600; border-bottom:1px solid #f2d9ae; }
+  .stat-line:last-child{ border-bottom:none; }
+  .stat-line b{ color:#4a2a12; }
+
+  .result-score{ font-family:'Fredoka', sans-serif; font-size:44px; font-weight:700; color:#5c2e0f; text-align:center; margin:4px 0 0; }
+  .result-label{ font-size:12px; font-weight:700; color:#c39868; letter-spacing:1px; margin-bottom:8px; text-align:center; }
+  .new-best-tag{ display:block; text-align:center; background:#ffe38a; color:#8a4e00; font-size:12px; font-weight:800; padding:5px 10px; border-radius:10px; margin:0 auto 12px; width:fit-content; border:2px solid #d3a15a; }
+
+  .theme-item, .shop-item, .ach-item, .quest-item{
+    display:flex; align-items:center; gap:12px; background:#fff3da; border:2px solid #f2d9ae; border-radius:16px;
+    padding:12px; margin-bottom:10px;
+  }
+  .theme-swatch{ width:42px; height:42px; border-radius:12px; flex-shrink:0; background:#ffe9c4; box-shadow: inset 0 0 0 2px rgba(255,255,255,0.5); }
+  .item-info{ flex:1; min-width:0; }
+  .item-name{ font-size:13.5px; font-weight:700; color:#4a2a12; }
+  .item-desc{ font-size:11.5px; color:#a9784a; font-weight:600; margin-top:2px; }
+  .item-btn{
+    border:none; border-radius:12px; padding:8px 12px; font-size:12px; font-weight:800; cursor:pointer; flex-shrink:0;
+  }
+  .item-btn.buy{ background: linear-gradient(180deg,#ffbb47,#ff8a3d); color:#fff; }
+  .item-btn.selected{ background:#3fae6a; color:#fff; }
+  .item-btn.locked{ background:#f0dfc0; color:#b99566; }
+
+  .ach-item.locked{ opacity:0.5; }
+  .ach-ico{ font-size:26px; width:32px; text-align:center; flex-shrink:0; }
+  .progress-bar{ height:6px; background:#f0dfc0; border-radius:4px; margin-top:6px; overflow:hidden; }
+  .progress-fill{ height:100%; background: linear-gradient(90deg,#ffbb47,#ff8a3d); border-radius:4px; }
+
+  .settings-row{ display:flex; align-items:center; justify-content:space-between; padding:12px 4px; border-bottom:1px solid #f2d9ae; }
+  .settings-row:last-child{ border-bottom:none; }
+  .settings-label{ font-size:13.5px; font-weight:700; color:#6b3f18; }
+  .switch{ width:46px; height:26px; border-radius:14px; background:#f0dfc0; position:relative; cursor:pointer; flex-shrink:0; transition: background .18s ease; }
+  .switch.on{ background: linear-gradient(180deg,#ffbb47,#ff8a3d); }
+  .switch::after{ content:''; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff; transition: transform .18s ease; box-shadow:0 2px 4px rgba(0,0,0,0.2); }
+  .switch.on::after{ transform: translateX(20px); }
+  .quality-btns{ display:flex; gap:6px; }
+  .quality-btns button{ border:none; border-radius:10px; padding:7px 10px; font-size:11.5px; font-weight:800; background:#f0dfc0; color:#a9784a; cursor:pointer; }
+  .quality-btns button.active{ background: linear-gradient(180deg,#ffbb47,#ff8a3d); color:#fff; }
+
+  .lvl-row{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .lvl-badge{ font-family:'Fredoka', sans-serif; background: linear-gradient(135deg,#ffd23f,#ff9f40); color:#5c2e0f; font-weight:700; font-size:13px; border-radius:12px; padding:6px 12px; border:2px solid #7a3510; }
+  .xp-bar{ flex:1; height:8px; background:#f0dfc0; border-radius:4px; overflow:hidden; }
+  .xp-fill{ height:100%; background: linear-gradient(90deg,#ffbb47,#ff8a3d); border-radius:4px; }
+
+  ::-webkit-scrollbar{ width:0; height:0; }
+
+  /* ===================== FIREBASE: HESAP / ONLINE SIRALAMA / YOUTUBE ===================== */
+  .acc-pill{
+    display:flex; align-items:center; gap:7px; width:100%; margin:-2px 0 14px; padding:8px 12px;
+    border-radius:18px; border:1.5px solid #e8a93f; cursor:pointer;
+    background: linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,244,214,0.55));
+    backdrop-filter: blur(6px);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.7), 0 2px 6px rgba(122,53,16,0.1);
+    font-family:'Nunito',sans-serif; font-weight:800; font-size:12.5px; color:#5c3400;
+  }
+  .acc-pill.guest{ color:#a9784a; }
+  .acc-pill span:last-child{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .avatar-mini{ width:24px; height:24px; border-radius:50%; object-fit:cover; flex-shrink:0; border:1.5px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,0.25); }
+  .avatar-fallback{ display:flex; align-items:center; justify-content:center; background:#ffe0ad; font-size:13px; }
+  .avatar-big-wrap{ position:relative; width:84px; height:84px; margin:0 auto; }
+  .avatar-big{ width:84px; height:84px; border-radius:50%; object-fit:cover; border:3px solid #7a3510; box-shadow:0 4px 12px rgba(90,40,10,0.3); }
+  .avatar-big.avatar-fallback{ font-size:34px; }
+  .avatar-edit{
+    position:absolute; bottom:-2px; right:-2px; width:26px; height:26px; border-radius:50%;
+    background: linear-gradient(180deg,#ffbb47,#ff8a3d); display:flex; align-items:center; justify-content:center;
+    font-size:12px; border:2px solid #fff; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,0.3);
+  }
+  .tabs{ display:flex; gap:8px; margin-bottom:14px; }
+  .tab-btn{
+    flex:1; border:2px solid #d3a15a; background:#fff3da; color:#a9784a; font-weight:800; font-size:12.5px;
+    border-radius:14px; padding:9px 4px; cursor:pointer; font-family:'Nunito',sans-serif;
+  }
+  .tab-btn.active{ background: linear-gradient(180deg,#ffbb47,#ff8a3d); color:#fff; border-color:#b34d16; }
+  .lb-row{
+    display:flex; align-items:center; gap:8px; padding:9px 8px; border-radius:14px; margin-bottom:6px;
+    background:#fff3da; border:1.5px solid #f2d9ae;
+  }
+  .lb-row.me{ background:#ffe9b8; border-color:#e8a93f; }
+  .lb-rank{ width:26px; text-align:center; font-weight:900; font-size:13px; color:#6b3f18; flex-shrink:0; }
+  .lb-name{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:700; font-size:12.5px; color:#4a2a12; }
+  .lb-lvl{ font-size:10.5px; font-weight:800; color:#a9784a; flex-shrink:0; }
+  .lb-score{ color:#5c2e0f; font-size:13px; flex-shrink:0; min-width:36px; text-align:right; }
+
+  /* Menü sahnesine sıcak, yumuşak bir güneş ışığı katmanı */
+  .sun-glow{
+    position:absolute; top:-8%; right:8%; width:220px; height:220px; border-radius:50%; z-index:1;
+    background: radial-gradient(circle, rgba(255,244,200,0.95) 0%, rgba(255,222,140,0.55) 35%, rgba(255,222,140,0) 70%);
+    filter: blur(2px); animation: sunPulse 5s ease-in-out infinite;
+    pointer-events:none;
+  }
+  @keyframes sunPulse{ 0%,100%{ opacity:.85; transform:scale(1); } 50%{ opacity:1; transform:scale(1.08); } }
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<!-- ============ HUD ============ -->
+<div id="hud">
+  <div id="scoreValue">0</div>
+  <div id="comboWrap"><span id="comboText">x2 COMBO</span></div>
+</div>
+<button class="top-badge" id="bestBadge">🏆 <span id="bestValue">0</span></button>
+<div class="top-badge" id="coinBadge">🪙 <span id="coinValue">0</span></div>
+<button class="top-badge" id="menuBtn">☰</button>
+<button class="top-badge" id="soundBtn">🔊</button>
+<div id="hint" class="hidden">👆 Dokun ve bırak</div>
+<div id="fpsCounter" class="hidden">60 FPS</div>
+
+<!-- ============ ANA OVERLAY (tüm ekranlar buradan yönetilir) ============ -->
+<div class="overlay" id="mainOverlay">
+  <div class="menu-scene" aria-hidden="true">
+    <div class="zoomLayer">
+      <div class="sun-glow"></div>
+      <div class="glare g1"></div>
+      <div class="glare g2"></div>
+      <div class="cloud c1"></div>
+      <div class="cloud c2"></div>
+      <div class="cloud c3"></div>
+      <div class="cloud c4"></div>
+      <div class="mountain back">
+        <svg viewBox="0 0 400 160" preserveAspectRatio="none"><path d="M0 160 L0 95 L45 55 L85 100 L130 40 L175 90 L215 60 L260 110 L300 70 L340 105 L400 60 L400 160 Z" fill="#8fb8d9"/></svg>
+      </div>
+      <div class="mountain front">
+        <svg viewBox="0 0 400 140" preserveAspectRatio="none"><path d="M0 140 L0 110 L40 70 L80 105 L120 55 L165 100 L210 65 L250 100 L290 75 L330 100 L400 80 L400 140 Z" fill="#6f9fc4"/></svg>
+      </div>
+    </div>
+    <div class="motes">
+      <div class="mote"></div><div class="mote"></div><div class="mote"></div><div class="mote"></div>
+      <div class="mote"></div><div class="mote"></div><div class="mote"></div><div class="mote"></div>
+    </div>
+  </div>
+  <div class="card" id="mainCard"></div>
+</div>
+
+<!-- ============ FIREBASE (Auth + Firestore + Storage) KÖPRÜSÜ ============
+     Modül script olarak yüklenir ve window.__FB üzerinden ana oyun
+     script'ine (aşağıdaki klasik <script>) fonksiyonları açar. Bu sayede
+     oyunun ana mantığına dokunmadan Firebase entegre edilebiliyor. -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+  import {
+    getAuth, GoogleAuthProvider, signInWithPopup, signInAnonymously,
+    onAuthStateChanged, signOut
+  } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+  import {
+    getFirestore, doc, setDoc, getDoc, onSnapshot,
+    collection, query, orderBy, limit, where, addDoc, serverTimestamp, Timestamp
+  } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+  import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDfD2tOQBcSoqErK2RG3CUOzB48iGWrXGE",
+    authDomain: "block9-d28c0.firebaseapp.com",
+    projectId: "block9-d28c0",
+    storageBucket: "block9-d28c0.firebasestorage.app",
+    messagingSenderId: "660714300663",
+    appId: "1:660714300663:web:0e63e7a9a6821a3b545ff2",
+    measurementId: "G-C38WSSPVL1"
+  };
+
+  try{
+    const app = initializeApp(firebaseConfig);
+    window.__FB = {
+      auth: getAuth(app), db: getFirestore(app), storage: getStorage(app),
+      GoogleAuthProvider, signInWithPopup, signInAnonymously, onAuthStateChanged, signOut,
+      doc, setDoc, getDoc, onSnapshot, collection, query, orderBy, limit, where, addDoc, serverTimestamp, Timestamp,
+      ref, uploadBytes, getDownloadURL
+    };
+  }catch(e){
+    console.warn('Firebase başlatılamadı, oyun yerel modda devam ediyor:', e);
+    window.__FB = null;
+  }
+  window.dispatchEvent(new Event('__fbReady'));
+</script>
+
+<script>
+(function(){
+  "use strict";
+
+  /* =========================================================
+     STORAGE - localStorage kullanır, erişilemezse hafızaya
+     (in-memory) düşer, oyun asla çökmez.
+  ========================================================= */
+  const MemStore = {};
+  const Storage = {
+    get(key, def){
+      try{
+        const v = localStorage.getItem(key);
+        return v !== null ? JSON.parse(v) : (key in MemStore ? MemStore[key] : def);
+      }catch(e){ return key in MemStore ? MemStore[key] : def; }
+    },
+    set(key, val){
+      MemStore[key] = val;
+      try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ /* sandbox ortamında localStorage kapalı olabilir, sorun değil */ }
+    }
+  };
+
+  /* =========================================================
+     VERİ TANIMLARI
+  ========================================================= */
+  /* Temalar artık coin ile doğrudan satın alınmıyor — Seviye ilerlemesi
+     veya belirli bir Başarım ile kilidi açılıyor. Coin'lerin gideceği yer
+     Mağazadaki "Şans Kutusu" (crate) ve takviyeler oldu (bkz. LUCKY_CRATE). */
+  const THEMES = [
+    { id:'classic',    name:'Klasik',       unlockLevel:1,  bg:'day',     colors:['rainbow'] },
+    { id:'tropical',   name:'Tropikal',     unlockLevel:2,  bg:'day',     colors:['#2ec4b6','#ffd23f','#ff6f59','#4dd0e1'] },
+    { id:'desert',     name:'Çöl',          unlockLevel:3,  bg:'sunset',  colors:['#e8a33d','#d97b3f','#f2c14e','#c96a3c'] },
+    { id:'medieval',   name:'Ortaçağ',      unlockLevel:4,  bg:'sunrise', colors:['#8d6e63','#a1887f','#6d4c41','#bcaaa4'] },
+    { id:'snow',       name:'Kar',          unlockLevel:5,  bg:'night',   colors:['#bfe3ff','#eaf6ff','#8fc4ec','#d6ecff'], weather:'snow' },
+    { id:'sakura',     name:'Sakura',       unlockLevel:6,  bg:'day',     colors:['#ffb7c5','#ff8fab','#ffd6e0','#ff6f91'], weather:'leaves' },
+    { id:'industrial', name:'Endüstriyel',  unlockLevel:7,  bg:'city',    colors:['#78909c','#546e7a','#ffca28','#90a4ae'] },
+    { id:'space',      name:'Uzay',         unlockLevel:8,  bg:'space',   colors:['#7a5cff','#5c8dff','#c15cff','#5cffe0'] },
+    { id:'cyberpunk',  name:'Cyberpunk',    unlockAch:'combo_20', bg:'city', colors:['#ff2bd6','#2bf0ff','#7a2bff','#ff2b6e'] },
+    { id:'lava',       name:'Lav',          unlockAch:'perfect_100', bg:'night', colors:['#ff4e3a','#ff8a2b','#c0392b','#ff2d55'], weather:'meteor' }
+  ];
+
+  /* Coin sinki: doğrudan tema satın alma yerine "Şans Kutusu".
+     Rastgele ödül verir: coin bonusu, XP, takviye veya (nadir) anında
+     bir sonraki kilitli temanın açılması. */
+  const LUCKY_CRATE = { cost:40 };
+  const CRATE_POOL = [
+    { type:'coins', min:20, max:70, weight:34, label:t=>`🪙 +${t} Coin` },
+    { type:'xp',    min:30, max:90, weight:26, label:t=>`⭐ +${t} XP` },
+    { type:'consumable', weight:24 },
+    { type:'themeUnlock', weight:6 },
+    { type:'jackpot', min:150, max:260, weight:10, label:t=>`💎 BÜYÜK ÖDÜL! +${t} Coin` }
+  ];
+  function openLuckyCrate(){
+    if(profile.coins < LUCKY_CRATE.cost) return null;
+    profile.coins -= LUCKY_CRATE.cost;
+    const totalW = CRATE_POOL.reduce((s,e)=>s+e.weight,0);
+    let r = Math.random()*totalW, pick = CRATE_POOL[0];
+    for(const e of CRATE_POOL){ if(r < e.weight){ pick = e; break; } r -= e.weight; }
+    let resultText = '';
+    if(pick.type === 'coins'){
+      const amt = Math.round(pick.min + Math.random()*(pick.max-pick.min));
+      addCoins(amt); resultText = pick.label(amt);
+    } else if(pick.type === 'jackpot'){
+      const amt = Math.round(pick.min + Math.random()*(pick.max-pick.min));
+      addCoins(amt); resultText = pick.label(amt);
+    } else if(pick.type === 'xp'){
+      const amt = Math.round(pick.min + Math.random()*(pick.max-pick.min));
+      addXP(amt); resultText = pick.label(amt);
+    } else if(pick.type === 'consumable'){
+      const cs = CONSUMABLES[Math.floor(Math.random()*CONSUMABLES.length)];
+      profile.armedBoosts = profile.armedBoosts||[];
+      profile.armedBoosts.push(cs.id);
+      resultText = `${cs.ico} ${cs.name} (bir sonraki oyun için hazır)`;
+    } else if(pick.type === 'themeUnlock'){
+      const locked = THEMES.filter(t=>!profile.unlockedThemes.includes(t.id));
+      if(locked.length){
+        const t = locked[Math.floor(Math.random()*locked.length)];
+        profile.unlockedThemes.push(t.id);
+        resultText = `🎉 Yeni tema açıldı: ${t.name}!`;
+      } else {
+        const amt = 100; addCoins(amt); resultText = `🪙 +${amt} Coin (tüm temalar zaten açık)`;
+      }
+    }
+    saveProfile();
+    return resultText;
+  }
+
+  /* Seviye/başarım şartı sağlanan temaları otomatik açar */
+  function checkThemeUnlocks(){
+    let any = false;
+    THEMES.forEach(t=>{
+      if(profile.unlockedThemes.includes(t.id)) return;
+      const byLevel = t.unlockLevel!==undefined && profile.level >= t.unlockLevel;
+      const byAch = t.unlockAch && profile.achievementsUnlocked.includes(t.unlockAch);
+      if(byLevel || byAch){
+        profile.unlockedThemes.push(t.id);
+        showToast(`🎉 Yeni tema açıldı: ${t.name}!`);
+        any = true;
+      }
+    });
+    if(any) saveProfile();
+  }
+
+  const BG_TYPES = ['sunrise','day','sunset','night','aurora','space','city','clouds'];
+  const WEATHER_TYPES = ['none','rain','snow','stars','fireflies','fog','leaves','meteor'];
+
+  /* Mağazadaki tüketilebilir takviyeler - kola/enerji içeceği temalı,
+     satın alınınca bir sonraki oyun için "hazırlanır" (armedBoosts) */
+  const CONSUMABLES = [
+    { id:'cola',   name:'Sarı Kola',       ico:'🥤', cost:35, desc:'Bir sonraki oyunda bloklar %25 daha yavaş başlar' },
+    { id:'energy', name:'Enerji İçeceği',  ico:'⚡', cost:60, desc:'Bir sonraki oyunda 1 kez ıskalama seni elemez (kalkan)' }
+  ];
+
+  const ACHIEVEMENTS = [
+    { id:'first_perfect', name:'İlk Perfect',      desc:'İlk kez mükemmel yerleştir', ico:'🌟', target:1,    key:'totalPerfects', reward:20 },
+    { id:'perfect_10',    name:'Perfect Çırağı',   desc:'10 kez mükemmel yerleştir',  ico:'✨', target:10,   key:'totalPerfects', reward:30 },
+    { id:'perfect_50',    name:'Perfect Ustası',   desc:'50 kez mükemmel yerleştir',  ico:'💫', target:50,   key:'totalPerfects', reward:60 },
+    { id:'perfect_100',   name:'Perfect Efsanesi', desc:'100 kez mükemmel yerleştir', ico:'👑', target:100,  key:'totalPerfects', reward:100 },
+    { id:'combo_5',       name:'Combo Başlangıcı', desc:'5 combo yap',                ico:'🔥', target:5,    key:'maxCombo', reward:20 },
+    { id:'combo_10',      name:'Combo Ateşi',      desc:'10 combo yap',               ico:'🔥', target:10,   key:'maxCombo', reward:40 },
+    { id:'combo_20',      name:'Combo Ustası',     desc:'20 combo yap',               ico:'⚡', target:20,   key:'maxCombo', reward:80 },
+    { id:'score_100',     name:'Yükseliş',         desc:'Tek oyunda 100 skor yap',    ico:'📈', target:100,  key:'bestScore', reward:25 },
+    { id:'score_500',     name:'Gökdelen',         desc:'Tek oyunda 500 skor yap',    ico:'🏙️', target:500,  key:'bestScore', reward:60 },
+    { id:'score_1000',    name:'Bulutlara Dokun',  desc:'Tek oyunda 1000 skor yap',   ico:'☁️', target:1000, key:'bestScore', reward:120 },
+    { id:'blocks_100',    name:'İnşaatçı',         desc:'Toplam 100 blok yerleştir',  ico:'🧱', target:100,  key:'totalBlocks', reward:25 },
+    { id:'blocks_500',    name:'Usta İnşaatçı',    desc:'Toplam 500 blok yerleştir',  ico:'🏗️', target:500,  key:'totalBlocks', reward:60 },
+    { id:'blocks_1000',   name:'Mimar',            desc:'Toplam 1000 blok yerleştir', ico:'🏛️', target:1000, key:'totalBlocks', reward:110 },
+    { id:'blocks_10000',  name:'Efsanevi Mimar',   desc:'Toplam 10000 blok yerleştir',ico:'🌆', target:10000,key:'totalBlocks', reward:300 },
+    { id:'games_10',      name:'Isınıyor',         desc:'10 oyun bitir',              ico:'🎮', target:10,   key:'totalGames', reward:20 },
+    { id:'games_50',      name:'Bağımlı',          desc:'50 oyun bitir',              ico:'🎮', target:50,   key:'totalGames', reward:60 },
+    { id:'games_100',     name:'Efsane Oyuncu',    desc:'100 oyun bitir',             ico:'🏆', target:100,  key:'totalGames', reward:150 },
+    { id:'coins_100',     name:'Cepte Bozukluk',   desc:'Toplam 100 coin kazan',      ico:'🪙', target:100,  key:'totalCoinsEarned', reward:0 },
+    { id:'coins_500',     name:'Coin Koleksiyoncusu', desc:'Toplam 500 coin kazan',   ico:'💰', target:500,  key:'totalCoinsEarned', reward:0 },
+    { id:'coins_1000',    name:'Zengin',           desc:'Toplam 1000 coin kazan',     ico:'💎', target:1000, key:'totalCoinsEarned', reward:0 },
+    { id:'level_5',       name:'Seviye 5',         desc:'Seviye 5\'e ulaş',           ico:'⭐', target:5,    key:'level', reward:40 },
+    { id:'level_10',      name:'Seviye 10',        desc:'Seviye 10\'a ulaş',          ico:'🌠', target:10,   key:'level', reward:100 },
+    { id:'theme_unlock_1',name:'Yeni Görünüm',     desc:'İlk temayı satın al',        ico:'🎨', target:1,    key:'themesUnlocked', reward:0 },
+    { id:'all_themes',    name:'Koleksiyoner',     desc:'Tüm temaları satın al',      ico:'🏅', target:THEMES.length, key:'themesUnlocked', reward:200 }
+  ];
+
+  const QUEST_POOL = [
+    { id:'perfect20', desc:'20 Perfect yap',          target:20,  key:'dailyPerfects', reward:30 },
+    { id:'blocks100', desc:'100 blok yerleştir',      target:100, key:'dailyBlocks',   reward:25 },
+    { id:'score500',  desc:'Tek oyunda 500 skor yap', target:500, key:'dailyBestScore',reward:40 },
+    { id:'games5',    desc:'5 oyun bitir',            target:5,   key:'dailyGames',    reward:20 },
+    { id:'combo8',    desc:'8 combo yap',             target:8,   key:'dailyMaxCombo', reward:25 }
+  ];
+
+  /* =========================================================
+     PROFİL (kalıcı veri) - LocalStorage'dan yüklenir
+  ========================================================= */
+  function todayStr(){ return new Date().toISOString().slice(0,10); }
+
+  function loadProfile(){
+    const def = {
+      coins: 0, xp: 0, level: 1,
+      bestScore: 0,
+      displayName: '', photoURL: '', youtubeRewardClaimed: false,
+      unlockedThemes: ['classic'],
+      currentTheme: 'classic',
+      blockStyle: 'classic',
+      armedBoosts: [],
+      achievementsUnlocked: [],
+      settings: { sound:true, music:true, vibration:true, quality:'high', showFps:false },
+      stats: { totalGames:0, totalBlocks:0, totalPerfects:0, maxCombo:0, totalCoinsEarned:0, totalTimePlayed:0, totalScore:0 },
+      daily: { date: todayStr(), quests:null, progress:{ dailyPerfects:0, dailyBlocks:0, dailyBestScore:0, dailyGames:0, dailyMaxCombo:0 }, claimed:[] },
+      leaderboard: []
+    };
+    const saved = Storage.get('kylProfile', null);
+    if(!saved) return def;
+    // eksik alanları tamamla (ileride yeni alan eklenirse eski kayıt bozulmasın)
+    return Object.assign({}, def, saved, {
+      settings: Object.assign({}, def.settings, saved.settings||{}),
+      stats: Object.assign({}, def.stats, saved.stats||{}),
+      daily: Object.assign({}, def.daily, saved.daily||{})
+    });
+  }
+
+  let profile = loadProfile();
+
+  function saveProfile(){ Storage.set('kylProfile', profile); fbCloudSyncDebounced(); }
+
+  /* =========================================================
+     FIREBASE ENTEGRASYONU (Auth + Firestore + Storage)
+     - Misafirler otomatik anonim oturum açar (leaderboard/skor için uid).
+     - Google ile giriş yapan oyuncular buluta senkronlanır.
+     - Bu blok, oyunun ana oynanış mantığına dokunmaz.
+  ========================================================= */
+  let fb = null;
+  let fbUser = null;
+  let fbSyncTimer = null;
+  const PLAYERS_COL = 'players';
+  const SCORES_COL  = 'scores';
+
+  function countryFlagFromLocale(){
+    try{
+      const loc = navigator.language || 'tr-TR';
+      const region = loc.split('-')[1];
+      if(!region || region.length!==2) return '🏳️';
+      const cps = [...region.toUpperCase()].map(c=>127397 + c.charCodeAt(0));
+      return String.fromCodePoint(...cps);
+    }catch(e){ return '🏳️'; }
+  }
+
+  function initFirebaseBridge(){
+    const attach = ()=>{
+      fb = window.__FB;
+      if(!fb) return; // Firebase başlatılamadıysa oyun tamamen yerel modda çalışmaya devam eder
+      fb.onAuthStateChanged(fb.auth, async (user)=>{
+        if(user){
+          const changed = !fbUser || fbUser.uid !== user.uid;
+          fbUser = user;
+          if(changed && !user.isAnonymous) await fbHandleSignedIn();
+        } else {
+          fbUser = null;
+          try{ await fb.signInAnonymously(fb.auth); }
+          catch(e){ /* Anonim giriş kapalıysa oyun yerelde sorunsuz devam eder */ }
+        }
+        renderAccountStatus();
+      });
+    };
+    if(window.__FB !== undefined) attach();
+    else window.addEventListener('__fbReady', attach, { once:true });
+  }
+
+  async function fbHandleSignedIn(){
+    if(!fb || !fbUser || fbUser.isAnonymous) return;
+    try{
+      const dref = fb.doc(fb.db, PLAYERS_COL, fbUser.uid);
+      const snap = await fb.getDoc(dref);
+      if(snap.exists()){
+        const cloud = snap.data();
+        const cloudBetter = (cloud.bestScore||0) > profile.bestScore || (cloud.level||1) > profile.level;
+        if(cloudBetter){
+          const useCloud = window.confirm(
+            `Bu hesapta bulutta kayıtlı ilerleme var (Seviye ${cloud.level||1}, En İyi Skor ${cloud.bestScore||0}).\n\n` +
+            `Bulut verisini bu cihaza yüklemek ister misin?\n(İptal edersen bu cihazdaki ilerleme korunur.)`
+          );
+          if(useCloud){
+            profile.bestScore = Math.max(profile.bestScore, cloud.bestScore||0);
+            profile.level = Math.max(profile.level, cloud.level||1);
+            profile.xp = cloud.xp!==undefined ? cloud.xp : profile.xp;
+            profile.coins = Math.max(profile.coins, cloud.coins||0);
+            if(cloud.youtubeRewardClaimed) profile.youtubeRewardClaimed = true;
+          }
+        }
+        profile.photoURL = profile.photoURL || cloud.photoURL || '';
+      }
+      profile.displayName = fbUser.displayName || profile.displayName || 'Oyuncu';
+      profile.photoURL = fbUser.photoURL || profile.photoURL || '';
+      saveProfile();
+      fbPushProfileNow();
+    }catch(e){ console.warn('Firebase profil senkronu başarısız:', e); }
+  }
+
+  function fbCloudSyncDebounced(){
+    if(!fb || !fbUser) return;
+    clearTimeout(fbSyncTimer);
+    fbSyncTimer = setTimeout(fbPushProfileNow, 1200);
+  }
+
+  async function fbPushProfileNow(){
+    if(!fb || !fbUser) return;
+    try{
+      const dref = fb.doc(fb.db, PLAYERS_COL, fbUser.uid);
+      await fb.setDoc(dref, {
+        uid: fbUser.uid,
+        anonymous: !!fbUser.isAnonymous,
+        displayName: profile.displayName || fbUser.displayName || 'Misafir',
+        photoURL: profile.photoURL || fbUser.photoURL || '',
+        country: countryFlagFromLocale(),
+        level: profile.level,
+        xp: profile.xp,
+        coins: profile.coins,
+        bestScore: profile.bestScore,
+        totalGames: profile.stats.totalGames,
+        totalPerfects: profile.stats.totalPerfects,
+        youtubeRewardClaimed: !!profile.youtubeRewardClaimed,
+        updatedAt: fb.serverTimestamp()
+      }, { merge:true });
+    }catch(e){ console.warn('Firebase yazma hatası:', e); }
+  }
+
+  async function fbSubmitScore(finalScore){
+    if(!fb || !fbUser || finalScore<=0) return;
+    try{
+      await fb.addDoc(fb.collection(fb.db, SCORES_COL), {
+        uid: fbUser.uid,
+        displayName: profile.displayName || fbUser.displayName || 'Misafir',
+        photoURL: profile.photoURL || fbUser.photoURL || '',
+        country: countryFlagFromLocale(),
+        score: finalScore,
+        level: profile.level,
+        createdAt: fb.serverTimestamp()
+      });
+    }catch(e){ console.warn('Skor gönderilemedi:', e); }
+    fbPushProfileNow();
+  }
+
+  async function fbSignInGoogle(){
+    if(!fb) return;
+    try{
+      const provider = new fb.GoogleAuthProvider();
+      await fb.signInWithPopup(fb.auth, provider);
+      showToast('✅ Giriş başarılı');
+    }catch(e){ console.warn(e); showToast('⚠️ Giriş yapılamadı'); }
+  }
+
+  async function fbSignOutUser(){
+    if(!fb) return;
+    try{ await fb.signOut(fb.auth); showToast('👋 Çıkış yapıldı'); renderAccountScreen(); }
+    catch(e){ console.warn(e); }
+  }
+
+  async function fbUploadAvatar(file){
+    if(!fb || !fbUser || fbUser.isAnonymous || !file) return;
+    try{
+      showToast('⏳ Fotoğraf yükleniyor...');
+      const sref = fb.ref(fb.storage, `avatars/${fbUser.uid}.jpg`);
+      await fb.uploadBytes(sref, file);
+      const url = await fb.getDownloadURL(sref);
+      profile.photoURL = url;
+      saveProfile();
+      fbPushProfileNow();
+      showToast('✅ Fotoğraf güncellendi');
+      renderAccountScreen();
+    }catch(e){ console.warn(e); showToast('⚠️ Yükleme başarısız'); }
+  }
+
+  function renderAccountStatus(){
+    const el = document.getElementById('acctStatusRow');
+    if(!el) return;
+    el.innerHTML = fbAccountStatusHtml();
+    const b = document.getElementById('btnAcctStatus');
+    if(b) b.onclick = ()=>{ playSfx('ui'); renderAccountScreen(); };
+  }
+  function fbAccountStatusHtml(){
+    if(fbUser && !fbUser.isAnonymous){
+      const photo = profile.photoURL || fbUser.photoURL;
+      return `<button class="acc-pill" id="btnAcctStatus">
+        ${photo?`<img class="avatar-mini" src="${photo}">`:'<span class="avatar-mini avatar-fallback">👤</span>'}
+        <span>${(profile.displayName||fbUser.displayName||'Oyuncu')}</span>
+      </button>`;
+    }
+    return `<button class="acc-pill guest" id="btnAcctStatus"><span class="avatar-mini avatar-fallback">👤</span><span>Misafir · Giriş Yap</span></button>`;
+  }
+
+  /* -------- HESABIM ekranı -------- */
+  function renderAccountScreen(){
+    let html = backHeader('👤 Hesabım');
+    if(fbUser && !fbUser.isAnonymous){
+      const photo = profile.photoURL || fbUser.photoURL;
+      html += `
+        <div style="text-align:center;margin-bottom:16px;">
+          <div class="avatar-big-wrap">
+            ${photo?`<img class="avatar-big" src="${photo}">`:'<div class="avatar-big avatar-fallback">👤</div>'}
+            <label class="avatar-edit" for="avatarFile">✏️</label>
+            <input type="file" id="avatarFile" accept="image/*" style="display:none;">
+          </div>
+          <div style="font-weight:800;font-size:16px;color:#4a2a12;margin-top:8px;">${profile.displayName || fbUser.displayName || 'Oyuncu'}</div>
+          <div class="item-desc">${fbUser.email||''}</div>
+        </div>
+        <div class="stat-line"><span>Seviye</span><b>${profile.level}</b></div>
+        <div class="stat-line"><span>En İyi Skor</span><b>${profile.bestScore}</b></div>
+        <div class="stat-line"><span>Coin</span><b>🪙 ${profile.coins}</b></div>
+        <div class="stat-line"><span>Toplam Oyun</span><b>${profile.stats.totalGames}</b></div>
+        <button class="big-btn secondary" id="btnSignOut" style="margin-top:16px;">🚪 Çıkış Yap</button>
+      `;
+    } else {
+      html += `
+        <div class="howto" style="text-align:center;">
+          <div style="font-size:40px;margin-bottom:8px;">🌥️</div>
+          <div class="item-desc" style="margin-bottom:0;">Skorunu buluta kaydet, online sıralamaya gir, profilini başka cihazlarda da gör.</div>
+        </div>
+        <button class="big-btn" id="btnGoogleSignIn" style="margin-top:14px;"><span class="btnIco">🔵</span>Google ile Giriş Yap</button>
+        <div class="item-desc" style="text-align:center;margin-top:6px;">Şu an misafir olarak oynuyorsun, ilerlemen bu cihazda saklanıyor.</div>
+      `;
+    }
+    mainCard.innerHTML = html;
+    attachBack();
+    const gb = document.getElementById('btnGoogleSignIn');
+    if(gb) gb.onclick = fbSignInGoogle;
+    const so = document.getElementById('btnSignOut');
+    if(so) so.onclick = fbSignOutUser;
+    const af = document.getElementById('avatarFile');
+    if(af) af.onchange = (e)=>{ if(e.target.files[0]) fbUploadAvatar(e.target.files[0]); };
+  }
+
+  /* -------- ONLINE SIRALAMA ekranı (gerçek zamanlı Firestore) -------- */
+  let lbUnsub = null;
+  function renderOnlineLeaderboardScreen(tab){
+    tab = tab || 'all';
+    if(lbUnsub){ lbUnsub(); lbUnsub = null; }
+    let html = backHeader('🌍 Online Sıralama');
+    html += `<div class="tabs">
+      <button class="tab-btn ${tab==='all'?'active':''}" data-tab="all">Tüm Zamanlar</button>
+      <button class="tab-btn ${tab==='week'?'active':''}" data-tab="week">Bu Hafta</button>
+    </div>
+    <div id="lbList"><div class="item-desc" style="text-align:center;padding:20px 0;">Yükleniyor...</div></div>`;
+    mainCard.innerHTML = html;
+    attachBack();
+    mainCard.querySelectorAll('.tab-btn').forEach(b=>{
+      b.onclick = ()=>{ playSfx('ui'); renderOnlineLeaderboardScreen(b.dataset.tab); };
+    });
+    if(!fb){
+      const el = document.getElementById('lbList');
+      if(el) el.innerHTML = '<div class="item-desc" style="text-align:center;padding:20px 0;">Online sıralamaya şu an ulaşılamıyor.</div>';
+      return;
+    }
+    if(tab==='all'){
+      const q = fb.query(fb.collection(fb.db, PLAYERS_COL), fb.orderBy('bestScore','desc'), fb.limit(50));
+      lbUnsub = fb.onSnapshot(q, (snap)=>{
+        const rows = []; snap.forEach(d=>rows.push(d.data()));
+        renderLbRows(rows, 'bestScore');
+      }, (err)=>{ console.warn(err); const el=document.getElementById('lbList'); if(el) el.innerHTML='<div class="item-desc" style="text-align:center;">Sıralama yüklenemedi.</div>'; });
+    } else {
+      const weekAgo = new Date(Date.now() - 7*24*60*60*1000);
+      const q = fb.query(fb.collection(fb.db, SCORES_COL), fb.where('createdAt','>=', fb.Timestamp.fromDate(weekAgo)), fb.orderBy('createdAt','desc'), fb.limit(300));
+      lbUnsub = fb.onSnapshot(q, (snap)=>{
+        const all = []; snap.forEach(d=>all.push(d.data()));
+        all.sort((a,b)=>(b.score||0)-(a.score||0));
+        const seen = new Set(); const rows = [];
+        all.forEach(r=>{ if(!seen.has(r.uid)){ seen.add(r.uid); rows.push(r); } });
+        renderLbRows(rows.slice(0,50), 'score');
+      }, (err)=>{ console.warn(err); const el=document.getElementById('lbList'); if(el) el.innerHTML='<div class="item-desc" style="text-align:center;">Sıralama yüklenemedi (Firestore bileşik indeks gerekebilir, konsoldaki hata linkine tıklayıp oluşturabilirsiniz).</div>'; });
+    }
+  }
+  function renderLbRows(rows, scoreKey){
+    const el = document.getElementById('lbList');
+    if(!el) return;
+    if(!rows.length){ el.innerHTML = '<div class="item-desc" style="text-align:center;padding:20px 0;">Henüz kayıt yok. İlk sırayı sen al!</div>'; return; }
+    el.innerHTML = rows.map((r,i)=>{
+      const photo = r.photoURL;
+      const isMe = fbUser && r.uid === fbUser.uid;
+      return `<div class="lb-row ${isMe?'me':''}">
+        <span class="lb-rank">${i<3?['🥇','🥈','🥉'][i]:('#'+(i+1))}</span>
+        ${photo?`<img class="avatar-mini" src="${photo}">`:'<span class="avatar-mini avatar-fallback">👤</span>'}
+        <span class="lb-name">${(r.displayName||'Oyuncu')} ${r.country&&r.country!=='🏳️'?r.country:''}</span>
+        <span class="lb-lvl">Lv${r.level||1}</span>
+        <b class="lb-score">${r[scoreKey]||0}</b>
+      </div>`;
+    }).join('');
+  }
+
+  /* -------- YOUTUBE ÖDÜLÜ ekranı --------
+     Not: Bu doğrulama istemci taraflıdır (onur sistemi). Sahte tıklamaya
+     karşı tam güvenli sunucu-taraflı doğrulama için bir Cloud Function
+     (YouTube Data API ile) gerekir; talep üzerine ayrıca eklenebilir. */
+  const YT_CHANNEL_URL = 'https://www.youtube.com/@CodeBugLimited?sub_confirmation=1';
+  function renderYoutubeScreen(){
+    let html = backHeader('🎁 YouTube Ödülü');
+    const claimed = !!profile.youtubeRewardClaimed;
+    html += `
+      <div class="howto" style="text-align:center;">
+        <div style="font-size:40px;margin-bottom:8px;">📺</div>
+        <div class="item-desc" style="margin-bottom:0;">Kanalımıza abone ol, tek seferlik özel ödülü kap:<br><b>🪙 500 Coin + Özel Rozet</b></div>
+      </div>
+      <button class="big-btn secondary" id="btnYtOpen" style="margin-top:14px;">📺 Kanala Abone Ol</button>
+      <button class="big-btn" id="btnYtClaim" ${claimed?'disabled':''} style="${claimed?'opacity:.5;cursor:default;':''}">${claimed?'✅ Ödül Alındı':'🎁 Abone Oldum, Ödülü Al'}</button>
+      <div class="item-desc" style="text-align:center;margin-top:6px;">Bu ödül her hesap için yalnızca bir kez verilir.</div>
+    `;
+    mainCard.innerHTML = html;
+    attachBack();
+    document.getElementById('btnYtOpen').onclick = ()=>{ playSfx('ui'); window.open(YT_CHANNEL_URL,'_blank'); };
+    const cb = document.getElementById('btnYtClaim');
+    if(cb) cb.onclick = ()=>{
+      if(profile.youtubeRewardClaimed) return;
+      profile.youtubeRewardClaimed = true;
+      addCoins(500);
+      saveProfile();
+      playSfx('achievement'); showToast('🎉 500 Coin kazandın!');
+      renderYoutubeScreen();
+    };
+  }
+
+  /* Günlük görevleri gerekirse yenile */
+  function refreshDailyQuests(){
+    if(profile.daily.date !== todayStr() || !profile.daily.quests){
+      const shuffled = [...QUEST_POOL].sort(()=>Math.random()-0.5).slice(0,3);
+      profile.daily = {
+        date: todayStr(), quests: shuffled,
+        progress:{ dailyPerfects:0, dailyBlocks:0, dailyBestScore:0, dailyGames:0, dailyMaxCombo:0 },
+        claimed: []
+      };
+      saveProfile();
+    }
+  }
+  refreshDailyQuests();
+  checkThemeUnlocks();
+
+  /* =========================================================
+     SEVİYE / XP HESABI
+  ========================================================= */
+  function xpForLevel(lvl){ return Math.round(100 * lvl * (1 + lvl*0.12)); }
+  function addXP(amount){
+    profile.xp += amount;
+    let needed = xpForLevel(profile.level);
+    while(profile.xp >= needed){
+      profile.xp -= needed;
+      profile.level += 1;
+      needed = xpForLevel(profile.level);
+      showToast(`⭐ Seviye ${profile.level}'e ulaştın!`);
+      checkAchievements();
+      checkThemeUnlocks();
+    }
+  }
+
+  /* =========================================================
+     COIN
+  ========================================================= */
+  function addCoins(amount){
+    if(amount <= 0) return;
+    profile.coins += amount;
+    profile.stats.totalCoinsEarned += amount;
+    document.getElementById('coinValue').textContent = profile.coins;
+    checkAchievements();
+  }
+
+  /* =========================================================
+     BAŞARIM KONTROLÜ
+  ========================================================= */
+  function statValueFor(key){
+    if(key === 'themesUnlocked') return profile.unlockedThemes.length;
+    if(key === 'level') return profile.level;
+    if(key === 'bestScore') return profile.bestScore;
+    return profile.stats[key] || 0;
+  }
+  function checkAchievements(){
+    let unlockedAny = false;
+    ACHIEVEMENTS.forEach(a => {
+      if(profile.achievementsUnlocked.includes(a.id)) return;
+      if(statValueFor(a.key) >= a.target){
+        profile.achievementsUnlocked.push(a.id);
+        if(a.reward) addCoins(a.reward);
+        showToast(`🏅 Başarım: ${a.name}`);
+        playSfx('achievement');
+        unlockedAny = true;
+      }
+    });
+    if(unlockedAny){ saveProfile(); checkThemeUnlocks(); }
+  }
+
+  /* =========================================================
+     GÖREV İLERLEMESİ
+  ========================================================= */
+  function bumpQuestProgress(key, amount){
+    profile.daily.progress[key] = (profile.daily.progress[key]||0) + amount;
+  }
+  function setQuestProgressMax(key, value){
+    profile.daily.progress[key] = Math.max(profile.daily.progress[key]||0, value);
+  }
+  function claimQuestIfDone(q){
+    if(profile.daily.claimed.includes(q.id)) return false;
+    if((profile.daily.progress[q.key]||0) >= q.target){
+      profile.daily.claimed.push(q.id);
+      addCoins(q.reward);
+      showToast(`✅ Görev tamamlandı: +${q.reward} 🪙`);
+      saveProfile();
+      return true;
+    }
+    return false;
+  }
+  function checkQuests(){
+    refreshDailyQuests();
+    (profile.daily.quests||[]).forEach(claimQuestIfDone);
+  }
+
+  /* =========================================================
+     TOAST (kısa bildirim)
+  ========================================================= */
+  function showToast(text){
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = text;
+    document.body.appendChild(t);
+    setTimeout(()=> t.remove(), 2800);
+  }
+
+  /* =========================================================
+     CANVAS KURULUMU
+  ========================================================= */
+  const canvas = document.getElementById("gameCanvas");
+  let ctx = canvas.getContext("2d");
+  let W=0, H=0, DPR=1;
+  function resize(){
+    DPR = Math.min(window.devicePixelRatio||1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = W*DPR; canvas.height = H*DPR;
+    canvas.style.width = W+"px"; canvas.style.height = H+"px";
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  /* =========================================================
+     DOM REFERANSLARI
+  ========================================================= */
+  const scoreValueEl = document.getElementById("scoreValue");
+  const comboWrapEl  = document.getElementById("comboWrap");
+  const comboTextEl  = document.getElementById("comboText");
+  const bestValueEl  = document.getElementById("bestValue");
+  const coinValueEl  = document.getElementById("coinValue");
+  const hintEl       = document.getElementById("hint");
+  const fpsEl        = document.getElementById("fpsCounter");
+  const mainOverlay  = document.getElementById("mainOverlay");
+  const mainCard     = document.getElementById("mainCard");
+  const menuBtn      = document.getElementById("menuBtn");
+  const soundBtn     = document.getElementById("soundBtn");
+
+  bestValueEl.textContent = profile.bestScore;
+  coinValueEl.textContent = profile.coins;
+  soundBtn.textContent = profile.settings.sound ? "🔊" : "🔇";
+  fpsEl.classList.toggle('hidden', !profile.settings.showFps);
+
+  /* =========================================================
+     KALİTE AYARINA GÖRE PARÇACIK ÇARPANI
+  ========================================================= */
+  const QUALITY_MULT = { low:0.25, medium:0.6, high:1, ultra:1.6 };
+  function qMult(){ return QUALITY_MULT[profile.settings.quality] || 1; }
+  function weatherEnabled(){ return profile.settings.quality !== 'low'; }
+
+  /* =========================================================
+     SES (Web Audio API) - efektler + üretilmiş (procedural) müzik
+  ========================================================= */
+  let audioCtx = null;
+  function getAudioCtx(){
+    if(!audioCtx){ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }
+    return audioCtx;
+  }
+  function tone(freq, dur, type, vol){
+    if(!profile.settings.sound) return;
+    try{
+      const c = getAudioCtx();
+      const osc = c.createOscillator(), gain = c.createGain();
+      osc.type = type||"sine"; osc.frequency.value = freq;
+      gain.gain.setValueAtTime(vol||0.13, c.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime+dur);
+      osc.connect(gain); gain.connect(c.destination);
+      osc.start(); osc.stop(c.currentTime+dur);
+    }catch(e){}
+  }
+  function playSfx(kind, comboTier){
+    comboTier = comboTier||0;
+    switch(kind){
+      case 'place': tone(400 + Math.random()*40, 0.08, 'sine'); break;
+      case 'perfect':
+        tone(620 + comboTier*30, 0.10, 'sine');
+        setTimeout(()=>tone(880 + comboTier*30, 0.14, 'sine'), 90);
+        break;
+      case 'combo': tone(750 + comboTier*50, 0.12, 'triangle', 0.16); break;
+      case 'coin': tone(1000, 0.07, 'square', 0.08); break;
+      case 'achievement': tone(500,0.1,'sine'); setTimeout(()=>tone(750,0.12,'sine'),100); setTimeout(()=>tone(1000,0.16,'sine'),210); break;
+      case 'gameover': tone(140, 0.4, 'sawtooth', 0.12); break;
+      case 'ui': tone(480, 0.05, 'sine', 0.08); break;
+    }
+  }
+
+  /* Basit üretilmiş müzik: pentatonik gam üzerinde arpej, combo'ya göre hızlanır */
+  const MUSIC_SCALE = [261.6,293.7,329.6,392.0,440.0,523.3];
+  let musicTimer = null, musicStep = 0;
+  function musicTick(){
+    if(!profile.settings.music || state !== 'playing'){ scheduleMusic(); return; }
+    const note = MUSIC_SCALE[musicStep % MUSIC_SCALE.length];
+    tone(note, 0.35, 'sine', 0.045);
+    musicStep++;
+    scheduleMusic();
+  }
+  function scheduleMusic(){
+    clearTimeout(musicTimer);
+    const tier = Math.min(typeof combo !== 'undefined' ? combo : 0, 5);
+    const interval = Math.max(180, 420 - tier*40); // combo arttıkça müzik hızlanır
+    musicTimer = setTimeout(musicTick, interval);
+  }
+  // Not: scheduleMusic() ilk çağrısı, 'combo' değişkeni tanımlandıktan sonra
+  // dosyanın en altındaki BAŞLANGIÇ bölümünde yapılıyor (TDZ hatasını önlemek için).
+
+  function vibrate(pattern){
+    if(profile.settings.vibration && navigator.vibrate){ try{ navigator.vibrate(pattern); }catch(e){} }
+  }
+
+  /* =========================================================
+     OYUN SABİTLERİ
+  ========================================================= */
+  const BLOCK_HEIGHT = 46;
+  const BASE_WIDTH_RATIO = 0.62;
+  const MIN_OVERLAP = 4;
+  const PERFECT_MARGIN = 0.045;
+  const ANCHOR_Y_RATIO = 0.58;
+  const LAND_ANIM_DURATION = 0.22;
+
+  /* =========================================================
+     OYUN DURUMU
+  ========================================================= */
+  let state = 'menu'; // menu | playing | paused | gameover
+  let stack = [], moving = null, debris = [], particles = [];
+  let score = 0, combo = 0, maxComboThisRun = 0, perfectsThisRun = 0, blocksThisRun = 0;
+  let alignmentSum = 0, alignmentCount = 0;
+  let runStartTime = 0;
+  let camWorldY = 0, camTargetWorldY = 0;
+  let camZoom = 1, camZoomTarget = 1;
+  let tapCount = 0, shake = 0, perfectFlash = 0;
+  let activeShield = false, activeSpeedMult = 1;
+  let currentBg = 'day', currentWeather = 'none';
+  let bgPhase = Math.random()*1000;
+  let weatherParticles = [];
+
+  /* Aktif temaya göre renk üretici */
+  function activeTheme(){
+    return THEMES.find(t => t.id === profile.currentTheme) || THEMES[0];
+  }
+  let rainbowBaseHue = Math.floor(Math.random()*360);
+  function colorForLevel(i){
+    const th = activeTheme();
+    if(th.colors[0] === 'rainbow'){
+      const hue = (rainbowBaseHue + i*16) % 360;
+      return `hsl(${hue}, 70%, 58%)`;
+    }
+    return th.colors[i % th.colors.length];
+  }
+
+  /* =========================================================
+     DÜNYA / EKRAN KOORDİNAT DÖNÜŞÜMÜ
+  ========================================================= */
+  function worldY(levelIndex){ return -levelIndex * BLOCK_HEIGHT; }
+  function screenY(levelIndex){
+    const anchor = H * ANCHOR_Y_RATIO;
+    return anchor + (worldY(levelIndex) - camWorldY);
+  }
+
+  /* =========================================================
+     ARKAPLAN + PARALLAX ÇİZİMİ
+  ========================================================= */
+  function pickRandomBgAndWeather(){
+    const th = activeTheme();
+    currentBg = th.bg || BG_TYPES[Math.floor(Math.random()*BG_TYPES.length)];
+    if(th.weather){ currentWeather = th.weather; }
+    else {
+      currentWeather = weatherEnabled() ? WEATHER_TYPES[Math.floor(Math.random()*WEATHER_TYPES.length)] : 'none';
+    }
+  }
+
+  function bgGradientColors(type){
+    switch(type){
+      case 'sunrise': return ['#ff9a76','#ffd27a','#8ec5d6'];
+      case 'day':     return ['#6ec6ff','#a3e0ff','#e9f9ff'];
+      case 'sunset':  return ['#3b2b52','#e26d5c','#ffb56b'];
+      case 'night':   return ['#05061a','#161a3d','#2b2f5c'];
+      case 'aurora':  return ['#031224','#0a2a3d','#124a4a'];
+      case 'space':   return ['#02020a','#0a0a2a','#1a0a3d'];
+      case 'city':    return ['#1b2340','#2c3564','#465088'];
+      case 'clouds':  return ['#7fb8e0','#bcdff0','#eef8ff'];
+      default: return ['#1b1f3b','#2b2f5c','#3d4180'];
+    }
+  }
+
+  let _bgGradCache = { key:'', grad:null };
+  function drawBackground(dt){
+    const cols = bgGradientColors(currentBg);
+    const key = currentBg+'|'+H;
+    if(_bgGradCache.key !== key){
+      const grad = ctx.createLinearGradient(0,0,0,H);
+      grad.addColorStop(0, cols[0]); grad.addColorStop(0.55, cols[1]); grad.addColorStop(1, cols[2]);
+      _bgGradCache = { key, grad };
+    }
+    ctx.fillStyle = _bgGradCache.grad; ctx.fillRect(0,0,W,H);
+
+    bgPhase += dt;
+
+    // Güneş / Ay
+    if(['sunrise','day','sunset','night','clouds'].includes(currentBg)){
+      const isNight = currentBg === 'night';
+      const cx = W*0.78, cy = H*0.22;
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = isNight ? '#f4f6ff' : '#fff6d8';
+      ctx.shadowColor = isNight ? '#c9d6ff' : '#ffe9a8';
+      ctx.shadowBlur = 40;
+      ctx.beginPath(); ctx.arc(cx, cy, 34, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+    }
+
+    // Aurora dalgaları
+    if(currentBg === 'aurora'){
+      for(let i=0;i<3;i++){
+        ctx.save();
+        ctx.globalAlpha = 0.18;
+        ctx.strokeStyle = ['#5cffb0','#5cc8ff','#c15cff'][i];
+        ctx.lineWidth = 26;
+        ctx.beginPath();
+        for(let x=0;x<=W;x+=20){
+          const y = H*0.18 + i*40 + Math.sin(x*0.01 + bgPhase*0.6 + i)*30;
+          if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    // Uzay yıldızları (statik nokta alanı - space temasında)
+    if(currentBg === 'space'){
+      ctx.save();
+      for(let i=0;i<40;i++){
+        const sx = (i*97 % W), sy = (i*53 % H);
+        const tw = 0.5 + 0.5*Math.sin(bgPhase*2 + i);
+        ctx.globalAlpha = 0.3 + tw*0.5;
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(sx, sy, 2, 2);
+      }
+      ctx.restore();
+    }
+
+    // Şehir silüeti (parallax - yavaş kayar)
+    if(currentBg === 'city'){
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = '#151833';
+      const offset = (bgPhase*6) % 120;
+      for(let x=-120; x<W+120; x+=60){
+        const bx = x - offset;
+        const bh = 60 + ((x*13)%90);
+        ctx.fillRect(bx, H-bh, 42, bh);
+      }
+      ctx.restore();
+    }
+
+    // Bulutlar (parallax)
+    if(currentBg === 'clouds' || currentBg === 'day' || currentBg === 'sunrise'){
+      ctx.save();
+      ctx.globalAlpha = 0.55;
+      ctx.fillStyle = '#ffffff';
+      for(let i=0;i<4;i++){
+        const cx = ((i*220 + bgPhase*14) % (W+200)) - 100;
+        const cy = H*0.14 + i*38;
+        drawCloud(cx, cy, 46);
+      }
+      ctx.restore();
+    }
+  }
+
+  function drawCloud(cx, cy, s){
+    ctx.beginPath();
+    ctx.arc(cx, cy, s*0.5, 0, Math.PI*2);
+    ctx.arc(cx+s*0.5, cy+6, s*0.4, 0, Math.PI*2);
+    ctx.arc(cx-s*0.5, cy+8, s*0.35, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  /* =========================================================
+     HAVA EFEKTLERİ (parçacık sistemleri)
+  ========================================================= */
+  function ensureWeatherParticles(){
+    const count = Math.round(60 * qMult());
+    weatherParticles = [];
+    if(currentWeather === 'none' || !weatherEnabled()) return;
+    for(let i=0;i<count;i++){
+      weatherParticles.push({
+        x: Math.random()*W, y: Math.random()*H,
+        s: 1+Math.random()*3, sp: 0.5+Math.random()
+      });
+    }
+  }
+  ensureWeatherParticles();
+
+  function updateWeather(dt){
+    if(currentWeather === 'none' || !weatherEnabled()) return;
+    weatherParticles.forEach(p => {
+      if(currentWeather==='rain'){ p.y += 700*p.sp*dt; p.x += 60*dt; if(p.y>H){p.y=-10; p.x=Math.random()*W;} }
+      else if(currentWeather==='snow'){ p.y += 60*p.sp*dt; p.x += Math.sin(p.y*0.02)*20*dt; if(p.y>H){p.y=-10; p.x=Math.random()*W;} }
+      else if(currentWeather==='leaves'){ p.y += 50*p.sp*dt; p.x += Math.sin(p.y*0.015 + p.s)*30*dt; if(p.y>H){p.y=-10; p.x=Math.random()*W;} }
+      else if(currentWeather==='fireflies'){ p.x += Math.sin(bgPhase+p.s)*20*dt; p.y += Math.cos(bgPhase+p.s)*20*dt; }
+      else if(currentWeather==='stars'){ /* sabit twinkle, konum sabit */ }
+      else if(currentWeather==='meteor'){ p.x -= 500*p.sp*dt; p.y += 300*p.sp*dt; if(p.x<-20||p.y>H){ p.x=W+Math.random()*200; p.y=-Math.random()*100; } }
+      else if(currentWeather==='fog'){ p.x += 15*dt; if(p.x>W+100) p.x=-100; }
+    });
+  }
+
+  function drawWeather(){
+    if(currentWeather === 'none' || !weatherEnabled()) return;
+    ctx.save();
+    weatherParticles.forEach(p => {
+      if(currentWeather==='rain'){
+        ctx.strokeStyle = 'rgba(180,210,255,0.5)'; ctx.lineWidth=1.5;
+        ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(p.x-6,p.y+14); ctx.stroke();
+      } else if(currentWeather==='snow'){
+        ctx.fillStyle='rgba(255,255,255,0.85)';
+        ctx.beginPath(); ctx.arc(p.x,p.y,p.s,0,Math.PI*2); ctx.fill();
+      } else if(currentWeather==='leaves'){
+        ctx.fillStyle='rgba(255,183,197,0.8)';
+        ctx.beginPath(); ctx.ellipse(p.x,p.y,p.s*1.6,p.s,bgPhase+p.s,0,Math.PI*2); ctx.fill();
+      } else if(currentWeather==='fireflies'){
+        ctx.fillStyle='rgba(255,240,160,0.9)'; ctx.shadowColor='#fff2a0'; ctx.shadowBlur=8;
+        ctx.beginPath(); ctx.arc(p.x,p.y,2,0,Math.PI*2); ctx.fill();
+      } else if(currentWeather==='stars'){
+        const tw = 0.4+0.4*Math.sin(bgPhase*3+p.s);
+        ctx.globalAlpha = tw; ctx.fillStyle='#fff';
+        ctx.fillRect(p.x,p.y,1.6,1.6);
+      } else if(currentWeather==='meteor'){
+        ctx.strokeStyle='rgba(255,255,255,0.7)'; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(p.x+30,p.y-18); ctx.stroke();
+      } else if(currentWeather==='fog'){
+        ctx.fillStyle='rgba(255,255,255,0.05)';
+        ctx.beginPath(); ctx.ellipse(p.x,p.y,120,40,0,0,Math.PI*2); ctx.fill();
+      }
+    });
+    ctx.restore();
+  }
+
+  /* =========================================================
+     GENEL PARÇACIK SİSTEMİ (perfect yıldızları, confetti)
+  ========================================================= */
+  function spawnStarBurst(x, y, count){
+    const n = Math.round((count||14) * qMult());
+    for(let i=0;i<n;i++){
+      const ang = Math.random()*Math.PI*2;
+      const spd = 100+Math.random()*180;
+      particles.push({
+        type:'star', x, y, vx:Math.cos(ang)*spd, vy:Math.sin(ang)*spd - 60,
+        life:1, decay: 0.9+Math.random()*0.6, size: 3+Math.random()*3,
+        color: Math.random()<0.5 ? '#ffd23f' : '#ffffff'
+      });
+    }
+  }
+
+  function updateParticles(dt){
+    for(let i=particles.length-1;i>=0;i--){
+      const p = particles[i];
+      p.vy += 400*dt;
+      p.x += p.vx*dt; p.y += p.vy*dt;
+      p.life -= p.decay*dt;
+      if(p.life<=0) particles.splice(i,1);
+    }
+  }
+  function drawParticles(){
+    if(!particles.length) return;
+    ctx.save();
+    for(let i=0;i<particles.length;i++){
+      const p = particles[i];
+      ctx.globalAlpha = Math.max(0,p.life);
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /* =========================================================
+     ENKAZ (kesilen bloklar düşer)
+  ========================================================= */
+  function spawnDebris(x,y,width,color,vx){
+    debris.push({ x,y,width,height:BLOCK_HEIGHT,color, vx:vx||0, vy:-60, gravity:900, rot:0, rotSpeed:(Math.random()-0.5)*4, alpha:1 });
+  }
+  function updateDebris(dt){
+    for(let i=debris.length-1;i>=0;i--){
+      const d=debris[i];
+      d.vy += d.gravity*dt; d.x += d.vx*40*dt; d.y += d.vy*dt; d.rot += d.rotSpeed*dt;
+      if(d.y>H+100) d.alpha -= dt*2;
+      if(d.y>H+300 || d.alpha<=0) debris.splice(i,1);
+    }
+  }
+
+  /* =========================================================
+     FLOATING TEXT (PERFECT / COMBO) - DOM tabanlı
+  ========================================================= */
+  function showFloatText(text, color, screenYPos, size){
+    const el = document.createElement('div');
+    el.className = 'floatText';
+    el.textContent = text;
+    el.style.top = (screenYPos||H*0.4)+'px';
+    el.style.color = color||'#ffd23f';
+    el.style.fontSize = (size||26)+'px';
+    document.body.appendChild(el);
+    setTimeout(()=> el.remove(), 950);
+  }
+  function whiteFlash(){
+    const el = document.createElement('div');
+    el.className = 'whiteFlash';
+    document.body.appendChild(el);
+    setTimeout(()=> el.remove(), 320);
+  }
+
+  /* =========================================================
+     BLOK ÇİZİMİ (gradient, bevel, glow, squash&stretch)
+  ========================================================= */
+  function roundRect(x,y,w,h,r){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r);
+    ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r);
+    ctx.closePath();
+  }
+
+  /* -------- PERF: renk başına gradyan önbelleği --------
+     Her blok her karede yeni bir gradient nesnesi ve (çok pahalı olan)
+     shadowBlur çağrısı yapmak, kule uzadıkça belirgin FPS düşüşüne
+     ("kasma") yol açıyordu. Artık:
+       1) gradyanlar renge göre bir kere üretilip önbelleğe alınıyor,
+       2) shadowBlur SADECE hareket eden aktif blokta (tek blok) ve
+          shadowBlur yerine ucuz bir radyal "halo" katmanıyla taklit ediliyor,
+       3) sabit bloklar için gölge, tek düz (blursuz) dikdörtgenle veriliyor. */
+  const _gradCache = new Map();
+  function blockGradient(color, h){
+    const key = color+'|'+h;
+    let g = _gradCache.get(key);
+    if(g) return g;
+    g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, lighten(color, 22));
+    g.addColorStop(0.5, color);
+    g.addColorStop(1, darken(color, 18));
+    _gradCache.set(key, g);
+    return g;
+  }
+
+  function drawBlock(x, y, width, color, opts){
+    opts = opts || {};
+    const h = BLOCK_HEIGHT;
+    const cx = x + width/2, cy = y + h/2;
+    const scaleX = opts.scaleX!==undefined ? opts.scaleX : 1;
+    const scaleY = opts.scaleY!==undefined ? opts.scaleY : 1;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(scaleX, scaleY);
+    ctx.translate(-cx, -cy);
+
+    if(opts.glow){
+      ctx.save();
+      ctx.globalAlpha = 0.55;
+      const haloG = ctx.createRadialGradient(cx, cy, h*0.2, cx, cy, width*0.75);
+      haloG.addColorStop(0, 'rgba(255,255,255,0.55)');
+      haloG.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = haloG;
+      ctx.fillRect(x-14, y-14, width+28, h+28);
+      ctx.restore();
+    } else {
+      ctx.fillStyle = 'rgba(20,10,5,0.16)';
+      ctx.fillRect(x+2, y+h-3, width, 6);
+    }
+
+    drawBlockClassic(x,y,width,h,color);
+
+    ctx.restore();
+  }
+
+  /* -------- Blok: yumuşak gradient + bevel highlight -------- */
+  function drawBlockClassic(x,y,width,h,color){
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.fillStyle = blockGradient(color, h);
+    roundRect(0,0,width,h,7);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    roundRect(0, 0, width, h*0.3, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.14)';
+    ctx.fillRect(0, h*0.83, width, h*0.17);
+    ctx.restore();
+  }
+
+  function hexToRgb(hex){
+    if(hex.startsWith('hsl')) return null;
+    const v = hex.replace('#','');
+    return { r:parseInt(v.substr(0,2),16), g:parseInt(v.substr(2,2),16), b:parseInt(v.substr(4,2),16) };
+  }
+  function lighten(color, amt){
+    if(color.startsWith('hsl')){
+      return color.replace(/(\d+)%\)$/, (m,l)=> Math.min(100,parseInt(l)+amt)+'%)');
+    }
+    const c = hexToRgb(color); if(!c) return color;
+    return `rgb(${Math.min(255,c.r+amt*2)},${Math.min(255,c.g+amt*2)},${Math.min(255,c.b+amt*2)})`;
+  }
+  function darken(color, amt){
+    if(color.startsWith('hsl')){
+      return color.replace(/(\d+)%\)$/, (m,l)=> Math.max(0,parseInt(l)-amt)+'%)');
+    }
+    const c = hexToRgb(color); if(!c) return color;
+    return `rgb(${Math.max(0,c.r-amt*2)},${Math.max(0,c.g-amt*2)},${Math.max(0,c.b-amt*2)})`;
+  }
+
+  /* =========================================================
+     MİNİ ÖNİZLEME (menülerde gerçek blok render'ı gösterir -
+     düz renkli kare yerine oyundaki asıl çizim kodunu kullanır)
+  ========================================================= */
+  function renderMiniBlockPreview(targetCanvas, colorHex){
+    if(!targetCanvas) return;
+    const dpr = Math.min(window.devicePixelRatio||1, 2);
+    const w = targetCanvas.clientWidth || 48, h = targetCanvas.clientHeight || 48;
+    targetCanvas.width = w*dpr; targetCanvas.height = h*dpr;
+    const pctx = targetCanvas.getContext('2d');
+    pctx.setTransform(dpr,0,0,dpr,0,0);
+    pctx.clearRect(0,0,w,h);
+    const saved = ctx;
+    ctx = pctx;
+    ctx.save();
+    ctx.shadowColor = 'rgba(60,30,10,0.35)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetY = 2;
+    const bw = w*0.74, bh = h*0.5, bx = (w-bw)/2, by = (h-bh)/2 + h*0.08;
+    drawBlockClassic(bx,by,bw,bh,colorHex);
+    ctx.restore();
+    ctx = saved;
+  }
+  function previewColorForTheme(t){
+    return t.colors[0] === 'rainbow' ? '#ff9d4d' : t.colors[0];
+  }
+
+  /* =========================================================
+     MENÜ ARKA PLANI - artık ayrı, elle çizilmiş bir "sahne" değil.
+     Oyunun kendi arka plan çizim fonksiyonunu (drawBackground) statik
+     bir kareye render ederek kullanıyoruz; böylece menü ile asıl oyun
+     ekranı %100 aynı görsel dile sahip olur (aynı gradyan, aynı güneş/
+     yıldız/bulut/şehir öğeleri), seçili temaya göre otomatik değişir.
+  ========================================================= */
+  function buildSimpleBackdrop(theme){
+    const bw = 900, bh = 1500;
+    const off = document.createElement('canvas');
+    off.width = bw; off.height = bh;
+    const octx = off.getContext('2d');
+
+    const savedCtx = ctx, savedW = W, savedH = H, savedBg = currentBg, savedPhase = bgPhase;
+    ctx = octx; W = bw; H = bh; currentBg = theme.bg; bgPhase = 0.4;
+    drawBackground(0);
+    ctx = savedCtx; W = savedW; H = savedH; currentBg = savedBg; bgPhase = savedPhase;
+
+    return off.toDataURL('image/png');
+  }
+  function refreshMenuBackdrop(){
+    const th = activeTheme();
+    mainOverlay.style.backgroundImage = `url(${buildSimpleBackdrop(th)})`;
+    mainOverlay.style.backgroundSize = 'cover';
+    mainOverlay.style.backgroundPosition = 'center bottom';
+  }
+
+
+  /* =========================================================
+     YENİ HAREKET EDEN BLOK
+  ========================================================= */
+  function spawnMovingBlock(){
+    const last = stack[stack.length-1];
+    const levelIndex = last.levelIndex + 1;
+    const width = last.width;
+    const speed = Math.min(230 + score*9, 640) * activeSpeedMult;
+    const fromLeft = Math.random() < 0.5;
+    const x = fromLeft ? -width : W;
+    const dir = fromLeft ? 1 : -1;
+    moving = { x, width, dir, speed, levelIndex };
+    camTargetWorldY = worldY(levelIndex);
+  }
+
+  /* =========================================================
+     OYUNU BAŞLAT
+  ========================================================= */
+  function startGame(){
+    pickRandomBgAndWeather();
+    ensureWeatherParticles();
+
+    score=0; combo=0; maxComboThisRun=0; perfectsThisRun=0; blocksThisRun=0;
+    alignmentSum=0; alignmentCount=0;
+    stack=[]; debris=[]; particles=[];
+    tapCount=0; shake=0; perfectFlash=0; camZoom=1; camZoomTarget=1;
+    runStartTime = performance.now();
+
+    // Mağazadan hazırlanmış takviyeleri bu koşuya uygula, sonra tüket
+    activeSpeedMult = 1; activeShield = false;
+    const boosts = profile.armedBoosts||[];
+    if(boosts.includes('cola')) activeSpeedMult = 0.75;
+    if(boosts.includes('energy')) activeShield = true;
+    if(boosts.length){
+      const names = boosts.map(id => (CONSUMABLES.find(c=>c.id===id)||{}).ico||'').join(' ');
+      if(names) showToast(`${names} Takviye aktif!`);
+      profile.armedBoosts = [];
+      saveProfile();
+    }
+
+    scoreValueEl.textContent = "0";
+    comboWrapEl.classList.remove('show');
+    hintEl.classList.remove('hidden');
+    hintEl.style.opacity = '1';
+
+    const baseWidth = W*BASE_WIDTH_RATIO;
+    const baseX = (W-baseWidth)/2;
+    stack.push({ x:baseX, width:baseWidth, levelIndex:0, landAnim: 999 });
+    camWorldY = worldY(0); camTargetWorldY = worldY(0);
+
+    spawnMovingBlock();
+    state = 'playing';
+    mainOverlay.classList.add('hidden');
+    scheduleMusic();
+  }
+
+  /* =========================================================
+     DOKUNMA MANTIĞI
+  ========================================================= */
+  function handleTap(){
+    if(state === 'menu'){ return; } // menüde tap play butonuna basılarak yapılır
+    if(state !== 'playing' || !moving) return;
+
+    tapCount++;
+    if(tapCount===1){
+      hintEl.style.transition='opacity .4s ease';
+      hintEl.style.opacity='0';
+      setTimeout(()=>hintEl.classList.add('hidden'),400);
+    }
+
+    const last = stack[stack.length-1];
+    const curLeft=moving.x, curRight=moving.x+moving.width;
+    const lastLeft=last.x, lastRight=last.x+last.width;
+    const overlapLeft=Math.max(curLeft,lastLeft), overlapRight=Math.min(curRight,lastRight);
+    const overlapWidth = overlapRight-overlapLeft;
+
+    if(overlapWidth <= MIN_OVERLAP){
+      if(activeShield){
+        activeShield = false;
+        showToast('🛡️ Enerji içeceği seni korudu!');
+        playSfx('ui');
+        spawnMovingBlock();
+        return;
+      }
+      spawnDebris(moving.x, screenY(moving.levelIndex), moving.width, colorForLevel(moving.levelIndex), moving.dir*2);
+      endGame();
+      return;
+    }
+
+    const leftDiff=Math.abs(curLeft-lastLeft), rightDiff=Math.abs(curRight-lastRight);
+    const isPerfect = (leftDiff <= last.width*PERFECT_MARGIN) && (rightDiff <= last.width*PERFECT_MARGIN);
+    const alignmentPct = Math.max(0, Math.min(100, (overlapWidth/last.width)*100));
+    alignmentSum += alignmentPct; alignmentCount++;
+
+    let placedX, placedWidth;
+    const blockScreenY = screenY(moving.levelIndex);
+
+    if(isPerfect){
+      placedX=lastLeft; placedWidth=lastRight-lastLeft;
+      combo++; maxComboThisRun = Math.max(maxComboThisRun, combo);
+      perfectsThisRun++;
+      profile.stats.totalPerfects++;
+      bumpQuestProgress('dailyPerfects',1);
+      setQuestProgressMax('dailyMaxCombo', combo);
+      profile.stats.maxCombo = Math.max(profile.stats.maxCombo, combo);
+
+      const tier = Math.min(combo,5);
+      perfectFlash = 1; shake = 5 + tier*1.4;
+      camZoomTarget = 1 + Math.min(combo,8)*0.012;
+      playSfx('perfect', tier);
+      if(combo>=2) playSfx('combo', tier);
+      vibrate(15 + tier*4);
+
+      spawnStarBurst(lastLeft+placedWidth/2, blockScreenY, 12 + tier*4);
+      showFloatText('PERFECT', '#ffffff', blockScreenY - 40, 24 + tier*2);
+      if(combo>=2){
+        comboTextEl.textContent = `x${combo} COMBO`;
+        comboWrapEl.classList.add('show');
+        showFloatText(`x${combo} COMBO`, '#ffd23f', blockScreenY - 74, 18 + tier*2);
+      }
+      if(tier>=3) whiteFlash();
+
+      const coinGain = 2 + tier;
+      addCoins(coinGain);
+      playSfx('coin');
+
+      const scoreGain = 2 + combo;
+      score += scoreGain;
+    } else {
+      placedX=overlapLeft; placedWidth=overlapWidth;
+      combo = 0;
+      comboWrapEl.classList.remove('show');
+      playSfx('place');
+
+      if(curLeft<overlapLeft) spawnDebris(curLeft, blockScreenY, overlapLeft-curLeft, colorForLevel(moving.levelIndex), -3);
+      if(curRight>overlapRight) spawnDebris(overlapRight, blockScreenY, curRight-overlapRight, colorForLevel(moving.levelIndex), 3);
+
+      addCoins(1);
+      score += 1;
+    }
+
+    blocksThisRun++;
+    profile.stats.totalBlocks++;
+    bumpQuestProgress('dailyBlocks',1);
+
+    stack.push({ x:placedX, width:placedWidth, levelIndex:moving.levelIndex, landAnim:0 });
+    scoreValueEl.textContent = score;
+    pulse(scoreValueEl);
+
+    if(score > profile.bestScore){ profile.bestScore = score; bestValueEl.textContent = score; }
+    setQuestProgressMax('dailyBestScore', score);
+    checkAchievements();
+
+    spawnMovingBlock();
+  }
+
+  function pulse(el){ el.classList.add('pulse'); setTimeout(()=>el.classList.remove('pulse'),160); }
+
+  /* =========================================================
+     OYUN BİTTİ
+  ========================================================= */
+  function endGame(){
+    state = 'gameover';
+    playSfx('gameover');
+    vibrate([40,40,80]);
+    shake = 16;
+    camZoomTarget = 0.92; // dramatik kamera - hafif uzaklaşma
+
+    profile.stats.totalGames++;
+    profile.stats.totalScore += score;
+    profile.stats.totalTimePlayed += Math.round((performance.now()-runStartTime)/1000);
+    bumpQuestProgress('dailyGames',1);
+    saveProfile();
+
+    const xpGain = Math.round(score*1.5 + perfectsThisRun*4 + maxComboThisRun*3);
+    addXP(xpGain);
+    checkQuests();
+    checkAchievements();
+    saveProfile();
+    fbSubmitScore(score);
+
+    setTimeout(()=>{ renderGameOverScreen(); openOverlay(); }, 420);
+  }
+
+  /* =========================================================
+     GÜNCELLEME DÖNGÜSÜ
+  ========================================================= */
+  let lastTime = performance.now();
+  let fpsAccum=0, fpsFrames=0, fpsLast=performance.now();
+
+  function update(dt){
+    camWorldY += (camTargetWorldY-camWorldY)*Math.min(dt*6,1);
+    camZoom += (camZoomTarget-camZoom)*Math.min(dt*4,1);
+
+    if(state==='playing' && moving){
+      moving.x += moving.dir*moving.speed*dt;
+      if(moving.x <= -moving.width*0.15 && moving.dir<0){ moving.x=-moving.width*0.15; moving.dir=1; }
+      else if(moving.x+moving.width >= W+moving.width*0.15 && moving.dir>0){ moving.x=W+moving.width*0.15-moving.width; moving.dir=-1; }
+    }
+
+    stack.forEach(b=>{ if(b.landAnim!==undefined && b.landAnim<LAND_ANIM_DURATION+1) b.landAnim+=dt; });
+
+    updateDebris(dt);
+    updateParticles(dt);
+    updateWeather(dt);
+
+    if(perfectFlash>0) perfectFlash = Math.max(0, perfectFlash-dt*2.2);
+    if(shake>0) shake = Math.max(0, shake-dt*40);
+  }
+
+  function landScale(t){
+    // basit squash & stretch: t=0 sıkışık, t sonunda normale döner (overshoot ile)
+    if(t>=LAND_ANIM_DURATION) return {sx:1, sy:1};
+    const p = t/LAND_ANIM_DURATION;
+    const overshoot = Math.sin(p*Math.PI) * (1-p);
+    return { sx: 1 + overshoot*0.18, sy: 1 - overshoot*0.22 };
+  }
+
+  function draw(){
+    ctx.save();
+    if(shake>0){ ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake); }
+
+    drawBackground(1/60);
+    drawWeather();
+
+    // Zoom efektini uygula (anchor noktasına göre)
+    const anchorX = W/2, anchorY = H*ANCHOR_Y_RATIO;
+    ctx.translate(anchorX, anchorY);
+    ctx.scale(camZoom, camZoom);
+    ctx.translate(-anchorX, -anchorY);
+
+    for(let i=0;i<stack.length;i++){
+      const b = stack[i];
+      const y = screenY(b.levelIndex);
+      if(y>H+BLOCK_HEIGHT || y<-BLOCK_HEIGHT) continue;
+      const anim = landScale(b.landAnim===undefined?999:b.landAnim);
+      drawBlock(b.x, y, b.width, colorForLevel(b.levelIndex), { scaleX:anim.sx, scaleY:anim.sy });
+    }
+
+    if(perfectFlash>0 && stack.length){
+      const b = stack[stack.length-1];
+      const y = screenY(b.levelIndex);
+      ctx.save();
+      ctx.globalAlpha = perfectFlash*0.7;
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth=4;
+      roundRect(b.x-4, y-4, b.width+8, BLOCK_HEIGHT+8, 8);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    if(state==='playing' && moving){
+      const y = screenY(moving.levelIndex);
+      drawBlock(moving.x, y, moving.width, colorForLevel(moving.levelIndex), { glow:true });
+    }
+
+    debris.forEach(d=>{
+      ctx.save();
+      ctx.globalAlpha = Math.max(0,d.alpha);
+      ctx.translate(d.x+d.width/2, d.y+d.height/2);
+      ctx.rotate(d.rot);
+      ctx.fillStyle = d.color;
+      roundRect(-d.width/2,-d.height/2,d.width,d.height,5);
+      ctx.fill();
+      ctx.restore();
+    });
+
+    drawParticles();
+
+    ctx.restore(); // zoom
+    ctx.restore(); // shake
+  }
+
+  function loop(now){
+    const dt = Math.min((now-lastTime)/1000, 0.05);
+    lastTime = now;
+
+    // sadece playing durumunda oyun mantığını güncelle, ama arkaplan/menüde de hafif hareket olsun
+    update(dt);
+    draw();
+
+    fpsFrames++; fpsAccum += dt;
+    if(now-fpsLast>500){
+      fpsEl.textContent = Math.round(fpsFrames/((now-fpsLast)/1000)) + ' FPS';
+      fpsFrames=0; fpsLast=now;
+    }
+
+    requestAnimationFrame(loop);
+  }
+
+  /* =========================================================
+     GİRİŞ OLAYLARI
+  ========================================================= */
+  function onPointerDown(e){
+    if(e.target.closest('.overlay') || e.target.closest('.top-badge')) return;
+    handleTap();
+  }
+  window.addEventListener('pointerdown', onPointerDown);
+  window.addEventListener('keydown', e=>{ if(e.code==='Space'){ e.preventDefault(); handleTap(); } });
+
+  menuBtn.addEventListener('click', ()=>{
+    playSfx('ui');
+    if(state==='playing'){ state='paused'; }
+    renderMenuScreen();
+    openOverlay();
+  });
+  soundBtn.addEventListener('click', ()=>{
+    profile.settings.sound = !profile.settings.sound;
+    soundBtn.textContent = profile.settings.sound ? '🔊' : '🔇';
+    saveProfile();
+  });
+
+  /* =========================================================
+     OVERLAY YÖNETİMİ
+  ========================================================= */
+  function openOverlay(){ mainOverlay.classList.remove('hidden'); }
+  function closeOverlay(){ mainOverlay.classList.add('hidden'); }
+
+  /* -------- ANA MENÜ -------- */
+  function renderMenuScreen(){
+    refreshDailyQuests();
+    const isResume = state==='paused';
+    const boosts = profile.armedBoosts||[];
+    const boostNote = boosts.length ? `<div class="item-desc" style="text-align:center;margin:-2px 0 10px;">${boosts.map(id=>(CONSUMABLES.find(c=>c.id===id)||{}).ico||'').join(' ')} Takviye hazır</div>` : '';
+    // Günlük ödül bildirimi: tamamlanmış ama henüz alınmamış görev var mı?
+    const dailyReady = (profile.daily.quests||[]).some(q=>{
+      const val = profile.daily.progress[q.key]||0;
+      return val >= q.target && !profile.daily.claimed.includes(q.id);
+    });
+    const dailyCount = (profile.daily.quests||[]).filter(q=>!profile.daily.claimed.includes(q.id)).length;
+    const xpNeeded = xpForLevel(profile.level);
+    const xpPct = Math.min(100, Math.round((profile.xp/xpNeeded)*100));
+
+    mainCard.innerHTML = `
+      <div class="logoWrap">
+        <div class="logoTitle">🧱 BLOCK 9</div>
+        <div class="logoSub">Build the Highest Tower</div>
+      </div>
+
+      <div id="acctStatusRow">${fbAccountStatusHtml()}</div>
+
+      <div class="lvl-row">
+        <div class="lvl-badge">⭐ Lv ${profile.level}</div>
+        <div class="xp-bar"><div class="xp-fill" style="width:${xpPct}%"></div></div>
+      </div>
+
+      <div class="curRow">
+        <div class="curPill coinPill" id="btnAddCoin" style="cursor:pointer;"><span class="curIco">🪙</span><span id="menuCoinVal">${profile.coins}</span><span class="addCoinBtn">+</span></div>
+        <div class="curPill" id="btnScoreMain" style="cursor:pointer;background:linear-gradient(180deg,#fff4d6,#ffdb8a); color:#7a4600; border:1.5px solid #e8a93f;"><span class="curIco" style="background:radial-gradient(circle at 35% 30%,#fff2b0,#ffb300 70%);">🏆</span><span>${profile.bestScore}</span></div>
+      </div>
+
+      <div class="menu-anim">
+        <button class="big-btn" id="btnPlay"><span class="btnIco">▶️</span>${isResume ? 'DEVAM ET' : 'OYNA'}</button>
+        ${isResume ? '<button class="big-btn small" id="btnRestartFromMenu">🔄 Yeniden Başlat</button>' : ''}
+        ${boostNote}
+        <div class="menu-grid">
+          <button class="menu-tile" id="tileShopMain" style="position:relative;"><span class="ico">🛒</span><span class="lbl">Mağaza</span></button>
+          <button class="menu-tile" id="tileThemesMain"><span class="ico">🎨</span><span class="lbl">Temalar</span></button>
+          <button class="menu-tile" id="tileDailyMain" style="position:relative;"><span class="ico">🎁</span><span class="lbl">Günlük</span>${dailyReady?`<span class="notif-dot" style="top:-6px;right:6px;">${dailyCount}</span>`:''}</button>
+          <button class="menu-tile" id="tileAchMain"><span class="ico">🏅</span><span class="lbl">Başarımlar</span></button>
+          <button class="menu-tile" id="tileStatsMain"><span class="ico">📊</span><span class="lbl">İstatistik</span></button>
+          <button class="menu-tile" id="tileSettingsMain"><span class="ico">⚙️</span><span class="lbl">Ayarlar</span></button>
+          <button class="menu-tile" id="tileAcctMain"><span class="ico">👤</span><span class="lbl">Hesabım</span></button>
+          <button class="menu-tile" id="tileOnlineLbMain"><span class="ico">🌍</span><span class="lbl">Sıralama</span></button>
+          <button class="menu-tile" id="tileYtMain"><span class="ico">🎁</span><span class="lbl">YouTube</span></button>
+        </div>
+      </div>
+
+      <div class="howto" style="margin-top:14px;">
+        <div class="howto-row"><span class="howto-emoji">👆</span> Ekrana dokun, hareket eden bloğu bırak</div>
+        <div class="howto-row"><span class="howto-emoji">🎯</span> Tam hizalarsan PERFECT ve combo kazanırsın</div>
+      </div>
+    `;
+    document.getElementById('btnPlay').onclick = ()=>{ playSfx('ui'); startGame(); };
+    const rb = document.getElementById('btnRestartFromMenu');
+    if(rb) rb.onclick = ()=>{ playSfx('ui'); startGame(); };
+    document.getElementById('btnScoreMain').onclick = ()=>{ playSfx('ui'); renderLeaderboardScreen(); };
+    document.getElementById('tileShopMain').onclick = ()=>{ playSfx('ui'); renderShopScreen(); };
+    document.getElementById('tileThemesMain').onclick = ()=>{ playSfx('ui'); renderThemesScreen(); };
+    document.getElementById('tileDailyMain').onclick = ()=>{ playSfx('ui'); renderDailyScreen(); };
+    document.getElementById('tileAchMain').onclick = ()=>{ playSfx('ui'); renderAchievementsScreen(); };
+    document.getElementById('tileStatsMain').onclick = ()=>{ playSfx('ui'); renderStatsScreen(); };
+    document.getElementById('tileSettingsMain').onclick = ()=>{ playSfx('ui'); renderSettingsScreen(); };
+    document.getElementById('btnAddCoin').onclick = ()=>{ playSfx('ui'); renderShopScreen(); };
+    document.getElementById('tileAcctMain').onclick = ()=>{ playSfx('ui'); renderAccountScreen(); };
+    document.getElementById('tileOnlineLbMain').onclick = ()=>{ playSfx('ui'); renderOnlineLeaderboardScreen(); };
+    document.getElementById('tileYtMain').onclick = ()=>{ playSfx('ui'); renderYoutubeScreen(); };
+    renderAccountStatus();
+  }
+
+  /* -------- BLOK MODU (görsel stil seçimi) -------- */
+  /* -------- HAKKINDA / INFO -------- */
+  function renderInfoScreen(){
+    let html = backHeader('ℹ️ Hakkında');
+    html += `
+      <div class="howto" style="text-align:center;">
+        <div style="font-size:40px;margin-bottom:6px;">🧱</div>
+        <div style="font-size:18px;font-weight:800;color:#24264a;margin-bottom:2px;">BLOCK 9</div>
+        <div class="item-desc" style="margin-bottom:14px;">Sürüm 1.0</div>
+        <div class="stat-line" style="border:none;flex-direction:column;gap:2px;padding:6px 0;">
+          <span style="font-size:12px;color:#8d8fa3;font-weight:700;">GELİŞTİRİCİLER</span>
+          <b style="font-size:14.5px;">Hakan Aytaş &amp; Şükran Aytaş</b>
+        </div>
+        <div class="stat-line" style="border:none;flex-direction:column;gap:2px;padding:6px 0 0;">
+          <span style="font-size:12px;color:#8d8fa3;font-weight:700;">ŞİRKET</span>
+          <b style="font-size:14.5px;">CodeBug Limited</b>
+        </div>
+        <div class="item-desc" style="margin-top:12px;">Hakan Aytaş ve Şükran Aytaş önderliğinde kurulan CodeBug Limited şirketi tarafından geliştirilmiştir.</div>
+      </div>
+      <div class="item-desc" style="text-align:center;">© ${new Date().getFullYear()} CodeBug Limited. Tüm hakları saklıdır.</div>
+    `;
+    mainCard.innerHTML = html;
+    attachBack(renderSettingsScreen);
+  }
+
+  function backHeader(title){
+    return `<div class="screen-header"><button class="back-btn" id="btnBack">←</button><h2>${title}</h2></div>`;
+  }
+  function attachBack(target){ document.getElementById('btnBack').onclick = ()=>{ playSfx('ui'); (target||renderMenuScreen)(); }; }
+
+  /* -------- TEMALAR -------- */
+  function themeLockLabel(t){
+    if(t.unlockLevel!==undefined) return `Seviye ${t.unlockLevel}'de açılır`;
+    if(t.unlockAch){ const a = ACHIEVEMENTS.find(x=>x.id===t.unlockAch); return a ? `"${a.name}" başarımıyla açılır` : 'Başarımla açılır'; }
+    return 'Kilitli';
+  }
+  function renderThemesScreen(){
+    let html = backHeader('🎨 Temalar');
+    html += `<div class="subtitle" style="margin-bottom:12px;">Temaların kilidi coin ile değil, seviye atlayarak ve başarımlarla açılır. Coin'lerini Mağaza'daki Şans Kutusu ve takviyeler için biriktir.</div>`;
+    THEMES.forEach(t=>{
+      const unlocked = profile.unlockedThemes.includes(t.id);
+      const selected = profile.currentTheme === t.id;
+      html += `<div class="theme-item">
+        <canvas class="theme-swatch" id="prevTheme_${t.id}" width="42" height="42"></canvas>
+        <div class="item-info"><div class="item-name">${t.name}</div><div class="item-desc">${unlocked ? (selected?'Seçili':'Sahipsin') : themeLockLabel(t)}</div></div>
+        <button class="item-btn ${selected?'selected':(unlocked?'buy':'locked')}" data-id="${t.id}" ${unlocked?'':'disabled'}>${selected?'✓':(unlocked?'Seç':'🔒')}</button>
+      </div>`;
+    });
+    mainCard.innerHTML = html;
+    attachBack(renderSettingsScreen);
+    THEMES.forEach(t=>{
+      renderMiniBlockPreview(document.getElementById('prevTheme_'+t.id), previewColorForTheme(t));
+    });
+    mainCard.querySelectorAll('[data-id]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const t = THEMES.find(x=>x.id===btn.dataset.id);
+        const unlocked = profile.unlockedThemes.includes(t.id);
+        if(unlocked){
+          profile.currentTheme = t.id; playSfx('ui'); saveProfile(); refreshMenuBackdrop(); renderThemesScreen();
+        } else {
+          showToast('🔒 ' + themeLockLabel(t));
+        }
+      };
+    });
+  }
+
+  /* -------- MAĞAZA (coin ile ekstra kozmetik / hızlı avantajlar) -------- */
+  function renderShopScreen(){
+    let html = backHeader('🛒 Mağaza');
+    html += `<div style="text-align:center;font-weight:800;color:#ffb400;margin-bottom:10px;">🪙 ${profile.coins}</div>`;
+
+    html += `<div class="item-name" style="margin-bottom:8px;">🥤 Takviyeler</div>`;
+    html += `<div class="subtitle" style="margin-bottom:10px;">Satın aldığın takviye bir sonraki oyunda otomatik devreye girer.</div>`;
+    CONSUMABLES.forEach(cs=>{
+      const armed = (profile.armedBoosts||[]).includes(cs.id);
+      html += `<div class="shop-item">
+        <div class="ach-ico">${cs.ico}</div>
+        <div class="item-info"><div class="item-name">${cs.name}</div><div class="item-desc">${cs.desc}</div></div>
+        <button class="item-btn ${armed?'selected':'buy'}" data-cid="${cs.id}">${armed?'Hazır ✓':cs.cost+' 🪙'}</button>
+      </div>`;
+    });
+
+    html += `<div class="item-name" style="margin:16px 0 8px;">🎁 Şans Kutusu</div>`;
+    html += `<div class="subtitle" style="margin-bottom:10px;">Coin, XP, takviye ve nadiren anında tema kilidi kazandırabilecek bir kutu aç. Temalar artık doğrudan satın alınmıyor — seviye atlayarak ve başarımlarla açılıyor.</div>`;
+    html += `<div class="shop-item" id="crateItem" style="cursor:pointer;">
+        <div class="ach-ico">🎁</div>
+        <div class="item-info"><div class="item-name">Şans Kutusu</div><div class="item-desc">Rastgele ödül: coin, XP, takviye veya tema</div></div>
+        <button class="item-btn buy gold-glow" id="crateBtn" style="box-shadow:none;">${LUCKY_CRATE.cost} 🪙</button>
+      </div>`;
+    mainCard.innerHTML = html;
+    attachBack(renderSettingsScreen);
+    mainCard.querySelectorAll('[data-cid]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const cs = CONSUMABLES.find(x=>x.id===btn.dataset.cid);
+        const armed = (profile.armedBoosts||[]).includes(cs.id);
+        if(armed){ return; }
+        if(profile.coins >= cs.cost){
+          profile.coins -= cs.cost;
+          profile.armedBoosts = profile.armedBoosts||[];
+          profile.armedBoosts.push(cs.id);
+          coinValueEl.textContent = profile.coins;
+          playSfx('coin'); showToast(`${cs.ico} ${cs.name} bir sonraki oyun için hazır!`);
+          saveProfile(); renderShopScreen();
+        } else { showToast('🪙 Yetersiz coin'); }
+      };
+    });
+    const crateBtn = document.getElementById('crateBtn');
+    crateBtn.onclick = ()=>{
+      if(profile.coins < LUCKY_CRATE.cost){ showToast('🪙 Yetersiz coin'); return; }
+      playSfx('coin');
+      const resultText = openLuckyCrate();
+      coinValueEl.textContent = profile.coins;
+      if(resultText){ showToast(resultText); playSfx('achievement'); vibrate(20); checkAchievements(); }
+      renderShopScreen();
+    };
+  }
+
+  /* -------- BAŞARIMLAR -------- */
+  function renderAchievementsScreen(){
+    let html = backHeader('🏅 Başarımlar');
+    ACHIEVEMENTS.forEach(a=>{
+      const unlocked = profile.achievementsUnlocked.includes(a.id);
+      const val = statValueFor(a.key);
+      const pct = Math.min(100, Math.round((val/a.target)*100));
+      html += `<div class="ach-item ${unlocked?'':'locked'}">
+        <div class="ach-ico">${a.ico}</div>
+        <div class="item-info">
+          <div class="item-name">${a.name}</div>
+          <div class="item-desc">${a.desc}</div>
+          ${!unlocked ? `<div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>` : ''}
+        </div>
+      </div>`;
+    });
+    mainCard.innerHTML = html;
+    attachBack(renderSettingsScreen);
+  }
+
+  /* -------- AYARLAR -------- */
+  function renderSettingsScreen(){
+    const s = profile.settings;
+    let html = backHeader('⚙️ Ayarlar');
+    html += `
+      <div class="settings-row"><div class="settings-label">🔊 Ses Efektleri</div><div class="switch ${s.sound?'on':''}" id="swSound"></div></div>
+      <div class="settings-row"><div class="settings-label">🎵 Müzik</div><div class="switch ${s.music?'on':''}" id="swMusic"></div></div>
+      <div class="settings-row"><div class="settings-label">📳 Titreşim</div><div class="switch ${s.vibration?'on':''}" id="swVib"></div></div>
+      <div class="settings-row"><div class="settings-label">📟 FPS Göster</div><div class="switch ${s.showFps?'on':''}" id="swFps"></div></div>
+      <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:8px;">
+        <div class="settings-label">🖼️ Grafik Kalitesi</div>
+        <div class="quality-btns">
+          ${['low','medium','high','ultra'].map(q=>`<button data-q="${q}" class="${s.quality===q?'active':''}">${q==='low'?'Düşük':q==='medium'?'Orta':q==='high'?'Yüksek':'Ultra'}</button>`).join('')}
+        </div>
+      </div>
+      <div class="subtitle" style="margin-top:16px;text-align:left;">Diğer</div>
+      <div class="mini-grid">
+        <button class="mini-tile" id="tileShop"><span class="ico">🛒</span><span class="lbl">Mağaza</span></button>
+        <button class="mini-tile" id="tileThemes"><span class="ico">🎨</span><span class="lbl">Temalar</span></button>
+        <button class="mini-tile" id="tileAch"><span class="ico">🏅</span><span class="lbl">Başarımlar</span></button>
+        <button class="mini-tile" id="tileStats"><span class="ico">📊</span><span class="lbl">İstatistik</span></button>
+        <button class="mini-tile" id="tileDaily"><span class="ico">🎁</span><span class="lbl">Günlük Görev</span></button>
+        <button class="mini-tile" id="tileInfo"><span class="ico">ℹ️</span><span class="lbl">Hakkında</span></button>
+      </div>
+    `;
+    mainCard.innerHTML = html;
+    attachBack();
+    document.getElementById('swSound').onclick = ()=>{ s.sound=!s.sound; soundBtn.textContent=s.sound?'🔊':'🔇'; saveProfile(); renderSettingsScreen(); };
+    document.getElementById('swMusic').onclick = ()=>{ s.music=!s.music; saveProfile(); renderSettingsScreen(); };
+    document.getElementById('swVib').onclick = ()=>{ s.vibration=!s.vibration; saveProfile(); renderSettingsScreen(); };
+    document.getElementById('swFps').onclick = ()=>{ s.showFps=!s.showFps; fpsEl.classList.toggle('hidden', !s.showFps); saveProfile(); renderSettingsScreen(); };
+    mainCard.querySelectorAll('[data-q]').forEach(btn=>{
+      btn.onclick = ()=>{ s.quality = btn.dataset.q; ensureWeatherParticles(); saveProfile(); renderSettingsScreen(); };
+    });
+    document.getElementById('tileShop').onclick = ()=>{ playSfx('ui'); renderShopScreen(); };
+    document.getElementById('tileThemes').onclick = ()=>{ playSfx('ui'); renderThemesScreen(); };
+    document.getElementById('tileAch').onclick = ()=>{ playSfx('ui'); renderAchievementsScreen(); };
+    document.getElementById('tileStats').onclick = ()=>{ playSfx('ui'); renderStatsScreen(); };
+    document.getElementById('tileDaily').onclick = ()=>{ playSfx('ui'); renderDailyScreen(); };
+    document.getElementById('tileInfo').onclick = ()=>{ playSfx('ui'); renderInfoScreen(); };
+  }
+
+  /* -------- İSTATİSTİKLER -------- */
+  function renderStatsScreen(){
+    const st = profile.stats;
+    const perfectRatio = st.totalBlocks>0 ? Math.round((st.totalPerfects/st.totalBlocks)*100) : 0;
+    let html = backHeader('📊 İstatistikler');
+    html += `
+      <div class="stat-line"><span>Toplam Oyun</span><b>${st.totalGames}</b></div>
+      <div class="stat-line"><span>Toplam Blok</span><b>${st.totalBlocks}</b></div>
+      <div class="stat-line"><span>Toplam Perfect</span><b>${st.totalPerfects}</b></div>
+      <div class="stat-line"><span>Perfect Oranı</span><b>%${perfectRatio}</b></div>
+      <div class="stat-line"><span>En Yüksek Combo</span><b>${st.maxCombo}</b></div>
+      <div class="stat-line"><span>En İyi Skor</span><b>${profile.bestScore}</b></div>
+      <div class="stat-line"><span>Toplam Skor</span><b>${st.totalScore}</b></div>
+      <div class="stat-line"><span>Toplam Coin</span><b>${st.totalCoinsEarned}</b></div>
+      <div class="stat-line"><span>Toplam Süre</span><b>${formatTime(st.totalTimePlayed)}</b></div>
+      <div class="stat-line"><span>Seviye</span><b>${profile.level}</b></div>
+    `;
+    mainCard.innerHTML = html;
+    attachBack(renderSettingsScreen);
+  }
+  function formatTime(sec){
+    const m = Math.floor(sec/60), s = sec%60;
+    return m>0 ? `${m}dk ${s}sn` : `${s}sn`;
+  }
+
+  /* -------- GÜNLÜK GÖREVLER -------- */
+  function renderDailyScreen(){
+    refreshDailyQuests();
+    let html = backHeader('🎁 Günlük Görevler');
+    (profile.daily.quests||[]).forEach(q=>{
+      const val = profile.daily.progress[q.key]||0;
+      const done = val >= q.target;
+      const claimed = profile.daily.claimed.includes(q.id);
+      const pct = Math.min(100, Math.round((val/q.target)*100));
+      html += `<div class="quest-item">
+        <div class="ach-ico">${claimed?'✅':'🎯'}</div>
+        <div class="item-info">
+          <div class="item-name">${q.desc}</div>
+          <div class="item-desc">${Math.min(val,q.target)}/${q.target} · Ödül: ${q.reward} 🪙</div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+        </div>
+        ${done && !claimed ? `<button class="item-btn buy" data-id="${q.id}">Al</button>` : ''}
+      </div>`;
+    });
+    mainCard.innerHTML = html;
+    attachBack(renderSettingsScreen);
+    mainCard.querySelectorAll('[data-id]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const q = profile.daily.quests.find(x=>x.id===btn.dataset.id);
+        if(q) claimQuestIfDone(q);
+        renderDailyScreen();
+      };
+    });
+  }
+
+  /* -------- YEREL SKOR TABLOSU -------- */
+  function addToLeaderboard(finalScore){
+    profile.leaderboard.push({ score: finalScore, date: todayStr() });
+    profile.leaderboard.sort((a,b)=>b.score-a.score);
+    profile.leaderboard = profile.leaderboard.slice(0,10);
+  }
+  function renderLeaderboardScreen(){
+    let html = backHeader('📜 Yerel Skor Tablosu');
+    html += `<div class="subtitle">Bu tablo yalnızca bu cihazda saklanır (internet gerektiren küresel skor tablosu bu offline oyunda desteklenmiyor).</div>`;
+    if(profile.leaderboard.length===0){
+      html += `<div class="subtitle">Henüz kayıt yok. Bir oyun bitir!</div>`;
+    } else {
+      profile.leaderboard.forEach((r,i)=>{
+        html += `<div class="stat-line"><span>#${i+1} · ${r.date}</span><b>${r.score}</b></div>`;
+      });
+    }
+    mainCard.innerHTML = html;
+    attachBack();
+  }
+
+  /* -------- OYUN SONU -------- */
+  function renderGameOverScreen(){
+    addToLeaderboard(score);
+    saveProfile();
+    const isNewBest = score >= profile.bestScore && score>0;
+    const avgAlign = alignmentCount>0 ? Math.round(alignmentSum/alignmentCount) : 0;
+    const timePlayed = Math.round((performance.now()-runStartTime)/1000);
+
+    mainCard.innerHTML = `
+      ${isNewBest ? '<div class="new-best-tag">🎉 YENİ REKOR!</div>' : ''}
+      <div class="result-label">KULEN YIKILDI</div>
+      <div class="result-score">${score}</div>
+      <div class="subtitle" style="margin-top:2px;">🏆 En İyi: ${profile.bestScore}</div>
+      <div class="stat-line"><span>Perfect Sayısı</span><b>${perfectsThisRun}</b></div>
+      <div class="stat-line"><span>En Büyük Combo</span><b>${maxComboThisRun}</b></div>
+      <div class="stat-line"><span>Ortalama Hizalama</span><b>%${avgAlign}</b></div>
+      <div class="stat-line"><span>Kazanılan Coin</span><b>🪙 ${profile.coins}</b></div>
+      <div class="stat-line"><span>Seviye</span><b>${profile.level}</b></div>
+      <div class="stat-line"><span>Süre</span><b>${formatTime(timePlayed)}</b></div>
+      <button class="big-btn" id="btnRestart" style="margin-top:16px;">🔄 TEKRAR OYNA</button>
+      <button class="big-btn secondary" id="btnShare">📤 Paylaş</button>
+      <button class="big-btn secondary" id="btnMenu">🏠 Ana Menü</button>
+    `;
+    document.getElementById('btnRestart').onclick = ()=>{ playSfx('ui'); startGame(); };
+    document.getElementById('btnMenu').onclick = ()=>{ playSfx('ui'); state='menu'; renderMenuScreen(); };
+    document.getElementById('btnShare').onclick = ()=>{
+      const text = `Block 9'da ${score} skor yaptım! 🧱`;
+      if(navigator.share){ navigator.share({text}).catch(()=>{}); }
+      else if(navigator.clipboard){ navigator.clipboard.writeText(text).then(()=>showToast('📋 Panoya kopyalandı')); }
+      else { showToast(text); }
+    };
+  }
+
+  /* =========================================================
+     BAŞLANGIÇ
+  ========================================================= */
+  pickRandomBgAndWeather();
+  refreshMenuBackdrop();
+  renderMenuScreen();
+  openOverlay();
+  scheduleMusic();
+  initFirebaseBridge();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
