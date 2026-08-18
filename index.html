@@ -131,14 +131,22 @@
   /* ===================== OVERLAY / SCREENS — PREMIUM SKY UI ===================== */
   .overlay{
     position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
-    z-index:20; padding:18px; overflow:hidden;
+    z-index:20; padding:0; overflow:hidden;
     background:
       radial-gradient(120% 70% at 50% 0%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0) 55%),
       linear-gradient(180deg, #8fd0ff 0%, #a9def5 22%, #cdeeff 46%, #eaf7ff 72%, #fff6e6 100%);
   }
   .hidden{ display:none !important; }
 
-  /* ---- Dekoratif menü arka planı: gökyüzü / dağ / bulut / parçacık katmanları ---- */
+  /* ---- Dekoratif menü arka planı KAPALI ----
+     Önceden burada temadan bağımsız, sabit mavi dağ/bulut SVG'leri
+     bulunuyordu; bu da seçili tema (örn. Uzay, Gece, Lav) ile menü
+     arka planının uyuşmamasına sebep oluyordu (blok renkleri temayı
+     gösterirken arka plan hep aynı "gündüz" görünümündeydi).
+     Artık menü arka planı, refreshMenuBackdrop() içinde asıl oyun
+     canvas'ının (drawBackground) aynısını üreterek CSS arka planı
+     olarak kullanıyor — bu yüzden statik katman devre dışı bırakıldı. */
+  .menu-scene{ display:none; }
   .menu-scene{ position:absolute; inset:0; z-index:0; overflow:hidden; pointer-events:none; }
   .menu-scene .zoomLayer{ position:absolute; inset:-4%; animation: menuZoom 22s ease-in-out infinite; }
 
@@ -189,17 +197,38 @@
   .card{
     position:relative; z-index:2;
     background: linear-gradient(180deg, rgba(255,252,244,0.96) 0%, rgba(255,240,214,0.94) 100%);
-    border:4px solid #7a3510; border-radius: 42px 42px 46px 46px / 46px 46px 42px 42px;
-    padding:26px 22px 22px; max-width:380px; width:100%;
-    max-height: 88vh; overflow-y:auto;
-    box-shadow:
-      inset 0 2px 0 rgba(255,255,255,0.9),
-      inset 0 -18px 30px -20px rgba(122,53,16,0.18),
-      0 10px 0 rgba(90,40,10,0.28), 0 28px 50px rgba(40,15,0,0.4);
+    border:0; border-radius:0;
+    padding: max(22px, env(safe-area-inset-top)) 22px max(18px, env(safe-area-inset-bottom));
+    width:100%; height:100%; height:100dvh;
+    max-width:520px; max-height:none;
+    overflow-y:auto; -webkit-overflow-scrolling:touch;
+    display:flex; flex-direction:column; justify-content:center;
+    box-shadow: inset 0 -18px 30px -20px rgba(122,53,16,0.1);
     backdrop-filter: blur(2px);
     animation: cardIn .4s cubic-bezier(.2,.9,.3,1.25);
   }
   @keyframes cardIn{ 0%{transform:scale(0.86) translateY(18px); opacity:0;} 100%{transform:scale(1) translateY(0); opacity:1;} }
+
+  /* İçerik uzun ekranlarda (başarımlar, mağaza, sıralama vb.) yukarıdan
+     başlasın; sadece kısa menü ekranı dikeyde ortalanır. */
+  .card:not(:has(.logoWrap)){ justify-content:flex-start; }
+
+  /* Kısa (yatay/az yükseklikli) ekranlarda menü elemanlarını sıkıştır,
+     böylece tam ekran menü kaydırma gerektirmeden sığar. */
+  @media (max-height: 720px){
+    .logoTitle{ font-size:32px; }
+    .logoWrap{ margin: -2px 0 2px; }
+    .lvl-row{ margin-bottom:8px; }
+    .menu-grid{ gap:6px; margin-top:8px; }
+    .menu-tile{ padding:8px 4px !important; }
+    .howto{ padding:10px 12px; margin-top:8px !important; }
+    .howto-row{ margin-bottom:5px; font-size:12px; }
+    .curRow{ margin:-4px 0 8px; }
+  }
+  @media (max-height: 620px){
+    .howto{ display:none; }
+    .logoSub{ display:none; }
+  }
 
   /* ---- Logo (BLOCK 9) ---- */
   .logoWrap{ text-align:center; margin: -4px 0 6px; animation: logoDrop .6s cubic-bezier(.25,.9,.3,1.3); }
@@ -365,6 +394,28 @@
   .xp-fill{ height:100%; background: linear-gradient(90deg,#ffbb47,#ff8a3d); border-radius:4px; }
 
   ::-webkit-scrollbar{ width:0; height:0; }
+
+  /* ===================== KAYIT (İsim + Cinsiyet) ===================== */
+  .reg-input{
+    width:100%; padding:14px 16px; border-radius:16px; border:2px solid #e8a93f;
+    background: linear-gradient(180deg,#fff,#fff8ea); color:#5c3400; font-weight:800; font-size:16px;
+    font-family:'Nunito', sans-serif; margin-bottom:14px; outline:none; text-align:center;
+    box-shadow: inset 0 2px 4px rgba(122,53,16,0.08);
+  }
+  .reg-input::placeholder{ color:#c9a26a; font-weight:700; }
+  .gender-row{ display:flex; gap:10px; margin-bottom:18px; }
+  .gender-opt{
+    flex:1; padding:14px 8px; border-radius:16px; border:2px solid #e8a93f; cursor:pointer;
+    background: linear-gradient(180deg,#fff4d6,#ffe6ad); text-align:center; font-weight:800; color:#7a4600;
+    font-family:'Nunito', sans-serif; transition: transform .12s ease, box-shadow .12s ease;
+  }
+  .gender-opt .gico{ font-size:26px; display:block; margin-bottom:4px; }
+  .gender-opt.selected{ background: linear-gradient(180deg,#ffbb47,#ff8a3d); color:#fff; border-color:#b34d16; box-shadow:0 4px 0 #b34d16; transform:translateY(-2px); }
+  .status-badge{
+    display:inline-flex; align-items:center; gap:5px; font-family:'Nunito',sans-serif; font-weight:900; font-size:11.5px;
+    background: linear-gradient(180deg,#eee0ff,#c9a4ff); color:#3c1a66; border:1.5px solid #9a63e8;
+    border-radius:12px; padding:3px 9px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.5);
+  }
 
   /* ===================== FIREBASE: HESAP / ONLINE SIRALAMA / YOUTUBE ===================== */
   .acc-pill{
@@ -605,8 +656,17 @@
   /* Mağazadaki tüketilebilir takviyeler - kola/enerji içeceği temalı,
      satın alınınca bir sonraki oyun için "hazırlanır" (armedBoosts) */
   const CONSUMABLES = [
-    { id:'cola',   name:'Sarı Kola',       ico:'🥤', cost:35, desc:'Bir sonraki oyunda bloklar %25 daha yavaş başlar' },
-    { id:'energy', name:'Enerji İçeceği',  ico:'⚡', cost:60, desc:'Bir sonraki oyunda 1 kez ıskalama seni elemez (kalkan)' }
+    { id:'cola',    name:'Sarı Kola',        ico:'🥤', cost:35,  desc:'Bir sonraki oyunda bloklar %25 daha yavaş başlar' },
+    { id:'energy',  name:'Enerji İçeceği',   ico:'⚡', cost:60,  desc:'Bir sonraki oyunda 1 kez ıskalama seni elemez (kalkan)' },
+    { id:'coinx2',  name:'Altın Anahtar',    ico:'🗝️', cost:70,  desc:'Bir sonraki oyunda kazanılan coin 2 katına çıkar' },
+    { id:'xpx2',    name:'Yıldız Tozu',      ico:'✨', cost:80,  desc:'Bir sonraki oyunda kazanılan XP %75 artar' },
+    { id:'freeze',  name:'Buz Küpü',         ico:'🧊', cost:50,  desc:'Bir sonraki oyunda ilk 5 blok daha kolay hizalanır (geniş tolerans)' },
+    { id:'magnet',  name:'Coin Mıknatısı',   ico:'🧲', cost:45,  desc:'Bir sonraki oyunda ıskalanan bloklarda bile 2 coin kazanırsın' }
+  ];
+  /* Kalıcı (bir kereye mahsus, tekrar satın alınamayan) yükseltmeler */
+  const UPGRADES = [
+    { id:'startBoost', name:'Sağlam Temel', ico:'🪨', cost:150, desc:'Her oyun kalıcı olarak %10 daha yavaş başlar' },
+    { id:'luckyStart', name:'Şanslı Başlangıç', ico:'🍀', cost:200, desc:'Her oyun sonunda kazanılan coin kalıcı olarak %15 artar' }
   ];
 
   const ACHIEVEMENTS = [
@@ -636,6 +696,27 @@
     { id:'all_themes',    name:'Koleksiyoner',     desc:'Tüm temaları satın al',      ico:'🏅', target:THEMES.length, key:'themesUnlocked', reward:200 }
   ];
 
+  /* Seviye atladıkça kazanılan ünvanlar (statü). Her ünvan bir seviye
+     aralığını kapsar; en yüksek uygun eşik seçilir. */
+  const STATUS_TITLES = [
+    { level:1,  name:'Acemi Usta',      ico:'🔰' },
+    { level:5,  name:'Çırak İnşaatçı',  ico:'🧱' },
+    { level:10, name:'Kule Ustası',     ico:'🏗️' },
+    { level:15, name:'Denge Ustası',    ico:'⚖️' },
+    { level:20, name:'Uzman Mimar',     ico:'🏛️' },
+    { level:30, name:'Gökdelen Kralı',  ico:'🏙️' },
+    { level:40, name:'Perfect Avcısı',  ico:'🎯' },
+    { level:50, name:'Kule Efsanesi',   ico:'👑' },
+    { level:75, name:'Block 9 Ustası',  ico:'🌟' },
+    { level:100,name:'Ölümsüz İnşaatçı',ico:'💎' }
+  ];
+  function statusForLevel(lvl){
+    let cur = STATUS_TITLES[0];
+    for(const t of STATUS_TITLES){ if(lvl >= t.level) cur = t; else break; }
+    return cur;
+  }
+  const GENDER_ICO = { female:'👩', male:'👨' };
+
   const QUEST_POOL = [
     { id:'perfect20', desc:'20 Perfect yap',          target:20,  key:'dailyPerfects', reward:30 },
     { id:'blocks100', desc:'100 blok yerleştir',      target:100, key:'dailyBlocks',   reward:25 },
@@ -653,11 +734,12 @@
     const def = {
       coins: 0, xp: 0, level: 1,
       bestScore: 0,
-      displayName: '', photoURL: '', youtubeRewardClaimed: false,
+      displayName: '', photoURL: '', gender: '', registered:false, youtubeRewardClaimed: false,
       unlockedThemes: ['classic'],
       currentTheme: 'classic',
       blockStyle: 'classic',
       armedBoosts: [],
+      upgradesOwned: [],
       achievementsUnlocked: [],
       settings: { sound:true, music:true, vibration:true, quality:'high', showFps:false },
       stats: { totalGames:0, totalBlocks:0, totalPerfects:0, maxCombo:0, totalCoinsEarned:0, totalTimePlayed:0, totalScore:0 },
@@ -744,7 +826,10 @@
         }
         profile.photoURL = profile.photoURL || cloud.photoURL || '';
       }
-      profile.displayName = fbUser.displayName || profile.displayName || 'Oyuncu';
+      if(!profile.registered){
+        profile.displayName = fbUser.displayName || profile.displayName || 'Oyuncu';
+        profile.registered = true;
+      }
       profile.photoURL = fbUser.photoURL || profile.photoURL || '';
       saveProfile();
       fbPushProfileNow();
@@ -766,6 +851,8 @@
         anonymous: !!fbUser.isAnonymous,
         displayName: profile.displayName || fbUser.displayName || 'Misafir',
         photoURL: profile.photoURL || fbUser.photoURL || '',
+        gender: profile.gender || '',
+        statusTitle: statusForLevel(profile.level).name,
         country: countryFlagFromLocale(),
         level: profile.level,
         xp: profile.xp,
@@ -786,6 +873,8 @@
         uid: fbUser.uid,
         displayName: profile.displayName || fbUser.displayName || 'Misafir',
         photoURL: profile.photoURL || fbUser.photoURL || '',
+        gender: profile.gender || '',
+        statusTitle: statusForLevel(profile.level).name,
         country: countryFlagFromLocale(),
         score: finalScore,
         level: profile.level,
@@ -833,49 +922,55 @@
     if(b) b.onclick = ()=>{ playSfx('ui'); renderAccountScreen(); };
   }
   function fbAccountStatusHtml(){
-    if(fbUser && !fbUser.isAnonymous){
-      const photo = profile.photoURL || fbUser.photoURL;
+    const photo = profile.photoURL || (fbUser && !fbUser.isAnonymous ? fbUser.photoURL : '');
+    const st = statusForLevel(profile.level);
+    if(profile.registered && profile.displayName){
       return `<button class="acc-pill" id="btnAcctStatus">
-        ${photo?`<img class="avatar-mini" src="${photo}">`:'<span class="avatar-mini avatar-fallback">👤</span>'}
-        <span>${(profile.displayName||fbUser.displayName||'Oyuncu')}</span>
+        ${photo?`<img class="avatar-mini" src="${photo}">`:'<span class="avatar-mini avatar-fallback">'+(GENDER_ICO[profile.gender]||'👤')+'</span>'}
+        <span>${profile.displayName} ${GENDER_ICO[profile.gender]||''} · ${st.ico} ${st.name}</span>
       </button>`;
     }
-    return `<button class="acc-pill guest" id="btnAcctStatus"><span class="avatar-mini avatar-fallback">👤</span><span>Misafir · Giriş Yap</span></button>`;
+    return `<button class="acc-pill guest" id="btnAcctStatus"><span class="avatar-mini avatar-fallback">👤</span><span>Misafir · Kayıt Ol</span></button>`;
   }
 
   /* -------- HESABIM ekranı -------- */
   function renderAccountScreen(){
+    if(!profile.registered){ renderRegisterScreen(false); return; }
+    const photo = profile.photoURL || (fbUser && !fbUser.isAnonymous ? fbUser.photoURL : '');
+    const st = statusForLevel(profile.level);
     let html = backHeader('👤 Hesabım');
-    if(fbUser && !fbUser.isAnonymous){
-      const photo = profile.photoURL || fbUser.photoURL;
-      html += `
-        <div style="text-align:center;margin-bottom:16px;">
-          <div class="avatar-big-wrap">
-            ${photo?`<img class="avatar-big" src="${photo}">`:'<div class="avatar-big avatar-fallback">👤</div>'}
-            <label class="avatar-edit" for="avatarFile">✏️</label>
-            <input type="file" id="avatarFile" accept="image/*" style="display:none;">
-          </div>
-          <div style="font-weight:800;font-size:16px;color:#4a2a12;margin-top:8px;">${profile.displayName || fbUser.displayName || 'Oyuncu'}</div>
-          <div class="item-desc">${fbUser.email||''}</div>
+    html += `
+      <div style="text-align:center;margin-bottom:16px;">
+        <div class="avatar-big-wrap">
+          ${photo?`<img class="avatar-big" src="${photo}">`:`<div class="avatar-big avatar-fallback">${GENDER_ICO[profile.gender]||'👤'}</div>`}
+          ${fbUser && !fbUser.isAnonymous ? '<label class="avatar-edit" for="avatarFile">✏️</label><input type="file" id="avatarFile" accept="image/*" style="display:none;">' : ''}
         </div>
-        <div class="stat-line"><span>Seviye</span><b>${profile.level}</b></div>
-        <div class="stat-line"><span>En İyi Skor</span><b>${profile.bestScore}</b></div>
-        <div class="stat-line"><span>Coin</span><b>🪙 ${profile.coins}</b></div>
-        <div class="stat-line"><span>Toplam Oyun</span><b>${profile.stats.totalGames}</b></div>
-        <button class="big-btn secondary" id="btnSignOut" style="margin-top:16px;">🚪 Çıkış Yap</button>
-      `;
+        <div style="font-weight:800;font-size:16px;color:#4a2a12;margin-top:8px;">${profile.displayName} ${GENDER_ICO[profile.gender]||''}</div>
+        <div style="margin-top:6px;"><span class="status-badge">${st.ico} ${st.name}</span></div>
+      </div>
+      <div class="stat-line"><span>Seviye</span><b>${profile.level}</b></div>
+      <div class="stat-line"><span>Ünvan</span><b>${st.ico} ${st.name}</b></div>
+      <div class="stat-line"><span>En İyi Skor</span><b>${profile.bestScore}</b></div>
+      <div class="stat-line"><span>Coin</span><b>🪙 ${profile.coins}</b></div>
+      <div class="stat-line"><span>Toplam Oyun</span><b>${profile.stats.totalGames}</b></div>
+      <button class="big-btn secondary" id="btnEditProfile" style="margin-top:16px;">✏️ İsim / Cinsiyet Düzenle</button>
+    `;
+    if(fbUser && !fbUser.isAnonymous){
+      html += `<div class="item-desc" style="text-align:center;margin-top:8px;">${fbUser.email||''}</div>
+        <button class="big-btn secondary" id="btnSignOut" style="margin-top:8px;">🚪 Çıkış Yap</button>`;
     } else {
       html += `
-        <div class="howto" style="text-align:center;">
-          <div style="font-size:40px;margin-bottom:8px;">🌥️</div>
-          <div class="item-desc" style="margin-bottom:0;">Skorunu buluta kaydet, online sıralamaya gir, profilini başka cihazlarda da gör.</div>
+        <div class="howto" style="text-align:center;margin-top:14px;">
+          <div style="font-size:32px;margin-bottom:6px;">🌥️</div>
+          <div class="item-desc" style="margin-bottom:0;">İsteğe bağlı: Google ile giriş yaparsan profilin bulutta yedeklenir ve başka cihazlarda da görünür. Dünya sıralamasına girmek için buna gerek yok, kayıt zaten yeterli.</div>
         </div>
-        <button class="big-btn" id="btnGoogleSignIn" style="margin-top:14px;"><span class="btnIco">🔵</span>Google ile Giriş Yap</button>
-        <div class="item-desc" style="text-align:center;margin-top:6px;">Şu an misafir olarak oynuyorsun, ilerlemen bu cihazda saklanıyor.</div>
+        <button class="big-btn" id="btnGoogleSignIn" style="margin-top:10px;"><span class="btnIco">🔵</span>Google ile Giriş Yap (opsiyonel)</button>
       `;
     }
     mainCard.innerHTML = html;
     attachBack();
+    const ep = document.getElementById('btnEditProfile');
+    if(ep) ep.onclick = ()=>{ playSfx('ui'); renderRegisterScreen(true); };
     const gb = document.getElementById('btnGoogleSignIn');
     if(gb) gb.onclick = fbSignInGoogle;
     const so = document.getElementById('btnSignOut');
@@ -930,11 +1025,12 @@
     el.innerHTML = rows.map((r,i)=>{
       const photo = r.photoURL;
       const isMe = fbUser && r.uid === fbUser.uid;
+      const gIco = GENDER_ICO[r.gender] || '';
+      const title = r.statusTitle ? ` · ${r.statusTitle}` : '';
       return `<div class="lb-row ${isMe?'me':''}">
         <span class="lb-rank">${i<3?['🥇','🥈','🥉'][i]:('#'+(i+1))}</span>
-        ${photo?`<img class="avatar-mini" src="${photo}">`:'<span class="avatar-mini avatar-fallback">👤</span>'}
-        <span class="lb-name">${(r.displayName||'Oyuncu')} ${r.country&&r.country!=='🏳️'?r.country:''}</span>
-        <span class="lb-lvl">Lv${r.level||1}</span>
+        ${photo?`<img class="avatar-mini" src="${photo}">`:`<span class="avatar-mini avatar-fallback">${gIco||'👤'}</span>`}
+        <span class="lb-name">${(r.displayName||'Oyuncu')} ${gIco} ${r.country&&r.country!=='🏳️'?r.country:''}<div style="font-size:10px;font-weight:700;opacity:.65;">Lv${r.level||1}${title}</div></span>
         <b class="lb-score">${r[scoreKey]||0}</b>
       </div>`;
     }).join('');
@@ -993,11 +1089,17 @@
   function addXP(amount){
     profile.xp += amount;
     let needed = xpForLevel(profile.level);
+    const prevStatus = statusForLevel(profile.level).name;
     while(profile.xp >= needed){
       profile.xp -= needed;
       profile.level += 1;
       needed = xpForLevel(profile.level);
-      showToast(`⭐ Seviye ${profile.level}'e ulaştın!`);
+      const newStatus = statusForLevel(profile.level);
+      if(newStatus.name !== prevStatus){
+        showToast(`${newStatus.ico} Yeni ünvan: ${newStatus.name}!`);
+      } else {
+        showToast(`⭐ Seviye ${profile.level}'e ulaştın!`);
+      }
       checkAchievements();
       checkThemeUnlocks();
     }
@@ -1197,7 +1299,7 @@
   let camWorldY = 0, camTargetWorldY = 0;
   let camZoom = 1, camZoomTarget = 1;
   let tapCount = 0, shake = 0, perfectFlash = 0;
-  let activeShield = false, activeSpeedMult = 1;
+  let activeShield = false, activeSpeedMult = 1, activeCoinMult = 1, activeXpMult = 1, activeMissCoin = 0, activeToleranceBoostBlocks = 0;
   let currentBg = 'day', currentWeather = 'none';
   let bgPhase = Math.random()*1000;
   let weatherParticles = [];
@@ -1659,10 +1761,17 @@
     runStartTime = performance.now();
 
     // Mağazadan hazırlanmış takviyeleri bu koşuya uygula, sonra tüket
-    activeSpeedMult = 1; activeShield = false;
+    activeSpeedMult = 1; activeShield = false; activeCoinMult = 1; activeXpMult = 1; activeMissCoin = 0; activeToleranceBoostBlocks = 0;
+    const owned = profile.upgradesOwned||[];
+    if(owned.includes('startBoost')) activeSpeedMult *= 0.9;
     const boosts = profile.armedBoosts||[];
-    if(boosts.includes('cola')) activeSpeedMult = 0.75;
+    if(boosts.includes('cola')) activeSpeedMult *= 0.75;
     if(boosts.includes('energy')) activeShield = true;
+    if(boosts.includes('coinx2')) activeCoinMult *= 2;
+    if(boosts.includes('xpx2')) activeXpMult *= 1.75;
+    if(boosts.includes('freeze')) activeToleranceBoostBlocks = 5;
+    if(boosts.includes('magnet')) activeMissCoin = 2;
+    if(owned.includes('luckyStart')) activeCoinMult *= 1.15;
     if(boosts.length){
       const names = boosts.map(id => (CONSUMABLES.find(c=>c.id===id)||{}).ico||'').join(' ');
       if(names) showToast(`${names} Takviye aktif!`);
@@ -1684,6 +1793,38 @@
     state = 'playing';
     mainOverlay.classList.add('hidden');
     scheduleMusic();
+  }
+
+  /* Buz Küpü / Coin Mıknatısı takviyeleri için: normalde oyunu bitirecek
+     tam ıskalamayı, güvenli minimum genişlikte bir blok yerleştirerek kurtarır. */
+  function placeBlockForced(){
+    const last = stack[stack.length-1];
+    const blockScreenY = screenY(moving.levelIndex);
+    const forcedWidth = Math.max(40, last.width*0.5);
+    let centerX = moving.x + moving.width/2;
+    centerX = Math.min(Math.max(centerX, last.x + forcedWidth/2), last.x + last.width - forcedWidth/2);
+    const placedX = centerX - forcedWidth/2;
+
+    combo = 0;
+    comboWrapEl.classList.remove('show');
+    playSfx('place');
+
+    addCoins(Math.max(1, Math.round((activeMissCoin||1) * activeCoinMult)));
+    score += 1;
+
+    blocksThisRun++;
+    profile.stats.totalBlocks++;
+    bumpQuestProgress('dailyBlocks',1);
+
+    stack.push({ x:placedX, width:forcedWidth, levelIndex:moving.levelIndex, landAnim:0 });
+    scoreValueEl.textContent = score;
+    pulse(scoreValueEl);
+
+    if(score > profile.bestScore){ profile.bestScore = score; bestValueEl.textContent = score; }
+    setQuestProgressMax('dailyBestScore', score);
+    checkAchievements();
+
+    spawnMovingBlock();
   }
 
   /* =========================================================
@@ -1714,10 +1855,18 @@
         spawnMovingBlock();
         return;
       }
+      if(activeToleranceBoostBlocks > 0){
+        activeToleranceBoostBlocks--;
+        showToast('🧊 Buz Küpü seni korudu!');
+        playSfx('ui');
+        placeBlockForced();
+        return;
+      }
       spawnDebris(moving.x, screenY(moving.levelIndex), moving.width, colorForLevel(moving.levelIndex), moving.dir*2);
       endGame();
       return;
     }
+    if(activeToleranceBoostBlocks > 0) activeToleranceBoostBlocks--;
 
     const leftDiff=Math.abs(curLeft-lastLeft), rightDiff=Math.abs(curRight-lastRight);
     const isPerfect = (leftDiff <= last.width*PERFECT_MARGIN) && (rightDiff <= last.width*PERFECT_MARGIN);
@@ -1752,7 +1901,7 @@
       }
       if(tier>=3) whiteFlash();
 
-      const coinGain = 2 + tier;
+      const coinGain = Math.max(1, Math.round((2 + tier) * activeCoinMult));
       addCoins(coinGain);
       playSfx('coin');
 
@@ -1767,7 +1916,7 @@
       if(curLeft<overlapLeft) spawnDebris(curLeft, blockScreenY, overlapLeft-curLeft, colorForLevel(moving.levelIndex), -3);
       if(curRight>overlapRight) spawnDebris(overlapRight, blockScreenY, curRight-overlapRight, colorForLevel(moving.levelIndex), 3);
 
-      addCoins(1);
+      addCoins(Math.max(1, Math.round(Math.max(1, activeMissCoin) * activeCoinMult)));
       score += 1;
     }
 
@@ -1804,7 +1953,7 @@
     bumpQuestProgress('dailyGames',1);
     saveProfile();
 
-    const xpGain = Math.round(score*1.5 + perfectsThisRun*4 + maxComboThisRun*3);
+    const xpGain = Math.round((score*1.5 + perfectsThisRun*4 + maxComboThisRun*3) * activeXpMult);
     addXP(xpGain);
     checkQuests();
     checkAchievements();
@@ -1965,7 +2114,7 @@
     mainCard.innerHTML = `
       <div class="logoWrap">
         <div class="logoTitle">🧱 BLOCK 9</div>
-        <div class="logoSub">Build the Highest Tower</div>
+        <div class="logoSub">Hakan Aytaş · CodeBug yapımı</div>
       </div>
 
       <div id="acctStatusRow">${fbAccountStatusHtml()}</div>
@@ -1974,6 +2123,7 @@
         <div class="lvl-badge">⭐ Lv ${profile.level}</div>
         <div class="xp-bar"><div class="xp-fill" style="width:${xpPct}%"></div></div>
       </div>
+      <div style="text-align:center;margin:-8px 0 12px;"><span class="status-badge">${statusForLevel(profile.level).ico} ${statusForLevel(profile.level).name}</span></div>
 
       <div class="curRow">
         <div class="curPill coinPill" id="btnAddCoin" style="cursor:pointer;"><span class="curIco">🪙</span><span id="menuCoinVal">${profile.coins}</span><span class="addCoinBtn">+</span></div>
@@ -2017,6 +2167,53 @@
     document.getElementById('tileOnlineLbMain').onclick = ()=>{ playSfx('ui'); renderOnlineLeaderboardScreen(); };
     document.getElementById('tileYtMain').onclick = ()=>{ playSfx('ui'); renderYoutubeScreen(); };
     renderAccountStatus();
+  }
+
+  /* -------- KAYIT (sadece isim + cinsiyet ile hızlı kayıt) --------
+     Google girişi gerektirmez: oyuncu bir isim yazar, kadın/erkek seçer,
+     bu bilgiyle (anonim Firebase oturumu üzerinden) Dünya Sıralaması'na
+     otomatik olarak dahil olur. */
+  function renderRegisterScreen(isEdit){
+    let genderPick = profile.gender || '';
+    let html = isEdit ? backHeader('👤 Profili Düzenle') : `
+      <div class="logoWrap">
+        <div class="logoTitle">🧱 BLOCK 9</div>
+        <div class="logoSub">Hakan Aytaş · CodeBug yapımı</div>
+      </div>
+    `;
+    html += `
+      <div class="subtitle" style="margin-top:${isEdit?0:6}px;">${isEdit?'Bilgilerini güncelle':'Dünya sıralamasına girmek için isim ve cinsiyetini seç'}</div>
+      <input type="text" class="reg-input" id="regNameInput" placeholder="İsmini yaz" maxlength="16" value="${(profile.displayName||'').replace(/"/g,'&quot;')}">
+      <div class="gender-row">
+        <div class="gender-opt" id="genFemale" data-g="female"><span class="gico">👩</span>Kadın</div>
+        <div class="gender-opt" id="genMale" data-g="male"><span class="gico">👨</span>Erkek</div>
+      </div>
+      <button class="big-btn" id="btnRegisterGo">${isEdit?'💾 Kaydet':'▶️ Oyuna Başla'}</button>
+      ${isEdit?'':'<div class="item-desc" style="text-align:center;margin-top:10px;">İstersen daha sonra Hesabım ekranından değiştirebilirsin.</div>'}
+    `;
+    mainCard.innerHTML = html;
+    if(isEdit) attachBack(renderAccountScreen);
+
+    const markGender = ()=>{
+      document.getElementById('genFemale').classList.toggle('selected', genderPick==='female');
+      document.getElementById('genMale').classList.toggle('selected', genderPick==='male');
+    };
+    markGender();
+    document.getElementById('genFemale').onclick = ()=>{ playSfx('ui'); genderPick='female'; markGender(); };
+    document.getElementById('genMale').onclick = ()=>{ playSfx('ui'); genderPick='male'; markGender(); };
+
+    document.getElementById('btnRegisterGo').onclick = ()=>{
+      const nameVal = document.getElementById('regNameInput').value.trim();
+      if(!nameVal){ showToast('✍️ Lütfen bir isim yaz'); return; }
+      playSfx('ui');
+      profile.displayName = nameVal.slice(0,16);
+      profile.gender = genderPick || profile.gender || '';
+      profile.registered = true;
+      saveProfile();
+      fbPushProfileNow();
+      showToast(isEdit ? '✅ Profil güncellendi' : `👋 Hoş geldin, ${profile.displayName}!`);
+      if(isEdit) renderAccountScreen(); else renderMenuScreen();
+    };
   }
 
   /* -------- BLOK MODU (görsel stil seçimi) -------- */
@@ -2101,6 +2298,17 @@
       </div>`;
     });
 
+    html += `<div class="item-name" style="margin:16px 0 8px;">🏆 Kalıcı Yükseltmeler</div>`;
+    html += `<div class="subtitle" style="margin-bottom:10px;">Bir kez satın alınır, tüm oyunlarda kalıcı olarak etkili olur.</div>`;
+    UPGRADES.forEach(u=>{
+      const owned = (profile.upgradesOwned||[]).includes(u.id);
+      html += `<div class="shop-item">
+        <div class="ach-ico">${u.ico}</div>
+        <div class="item-info"><div class="item-name">${u.name}</div><div class="item-desc">${u.desc}</div></div>
+        <button class="item-btn ${owned?'selected':'buy'}" data-uid="${u.id}" ${owned?'disabled':''}>${owned?'Alındı ✓':u.cost+' 🪙'}</button>
+      </div>`;
+    });
+
     html += `<div class="item-name" style="margin:16px 0 8px;">🎁 Şans Kutusu</div>`;
     html += `<div class="subtitle" style="margin-bottom:10px;">Coin, XP, takviye ve nadiren anında tema kilidi kazandırabilecek bir kutu aç. Temalar artık doğrudan satın alınmıyor — seviye atlayarak ve başarımlarla açılıyor.</div>`;
     html += `<div class="shop-item" id="crateItem" style="cursor:pointer;">
@@ -2121,6 +2329,20 @@
           profile.armedBoosts.push(cs.id);
           coinValueEl.textContent = profile.coins;
           playSfx('coin'); showToast(`${cs.ico} ${cs.name} bir sonraki oyun için hazır!`);
+          saveProfile(); renderShopScreen();
+        } else { showToast('🪙 Yetersiz coin'); }
+      };
+    });
+    mainCard.querySelectorAll('[data-uid]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const u = UPGRADES.find(x=>x.id===btn.dataset.uid);
+        if(!u || (profile.upgradesOwned||[]).includes(u.id)) return;
+        if(profile.coins >= u.cost){
+          profile.coins -= u.cost;
+          profile.upgradesOwned = profile.upgradesOwned||[];
+          profile.upgradesOwned.push(u.id);
+          coinValueEl.textContent = profile.coins;
+          playSfx('coin'); showToast(`${u.ico} ${u.name} kalıcı olarak açıldı!`);
           saveProfile(); renderShopScreen();
         } else { showToast('🪙 Yetersiz coin'); }
       };
@@ -2214,6 +2436,7 @@
       <div class="stat-line"><span>Toplam Coin</span><b>${st.totalCoinsEarned}</b></div>
       <div class="stat-line"><span>Toplam Süre</span><b>${formatTime(st.totalTimePlayed)}</b></div>
       <div class="stat-line"><span>Seviye</span><b>${profile.level}</b></div>
+      <div class="stat-line"><span>Ünvan</span><b>${statusForLevel(profile.level).ico} ${statusForLevel(profile.level).name}</b></div>
     `;
     mainCard.innerHTML = html;
     attachBack(renderSettingsScreen);
@@ -2291,6 +2514,7 @@
       <div class="stat-line"><span>Ortalama Hizalama</span><b>%${avgAlign}</b></div>
       <div class="stat-line"><span>Kazanılan Coin</span><b>🪙 ${profile.coins}</b></div>
       <div class="stat-line"><span>Seviye</span><b>${profile.level}</b></div>
+      <div class="stat-line"><span>Ünvan</span><b>${statusForLevel(profile.level).ico} ${statusForLevel(profile.level).name}</b></div>
       <div class="stat-line"><span>Süre</span><b>${formatTime(timePlayed)}</b></div>
       <button class="big-btn" id="btnRestart" style="margin-top:16px;">🔄 TEKRAR OYNA</button>
       <button class="big-btn secondary" id="btnShare">📤 Paylaş</button>
@@ -2311,7 +2535,7 @@
   ========================================================= */
   pickRandomBgAndWeather();
   refreshMenuBackdrop();
-  renderMenuScreen();
+  if(profile.registered){ renderMenuScreen(); } else { renderRegisterScreen(false); }
   openOverlay();
   scheduleMusic();
   initFirebaseBridge();
