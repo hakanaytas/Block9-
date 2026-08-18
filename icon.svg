@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8fd0ff"/>
+      <stop offset="45%" stop-color="#bfe6ff"/>
+      <stop offset="100%" stop-color="#fff2cf"/>
+    </linearGradient>
+    <linearGradient id="blockOrange" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffe08a"/>
+      <stop offset="55%" stop-color="#ffb23f"/>
+      <stop offset="100%" stop-color="#e2701a"/>
+    </linearGradient>
+    <linearGradient id="blockTeal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7fe8d8"/>
+      <stop offset="55%" stop-color="#2ec4b6"/>
+      <stop offset="100%" stop-color="#1c9186"/>
+    </linearGradient>
+    <linearGradient id="blockPink" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffb0c4"/>
+      <stop offset="55%" stop-color="#ff6f91"/>
+      <stop offset="100%" stop-color="#e0446a"/>
+    </linearGradient>
+  </defs>
+
+  <!-- arka plan: köşeleri yuvarlatılmış kare -->
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <!-- yumuşak zemin gölgesi -->
+  <ellipse cx="256" cy="410" rx="150" ry="22" fill="#5c3400" opacity="0.12"/>
+
+  <!-- alt blok (turuncu, en geniş) -->
+  <g>
+    <rect x="106" y="316" width="300" height="84" rx="18" fill="url(#blockOrange)" stroke="#7a3208" stroke-width="10"/>
+    <rect x="126" y="330" width="260" height="14" rx="7" fill="#fff" opacity="0.35"/>
+  </g>
+
+  <!-- orta blok (pembe, ortalanmış ve dar) -->
+  <g>
+    <rect x="146" y="230" width="220" height="84" rx="18" fill="url(#blockPink)" stroke="#7a1030" stroke-width="10"/>
+    <rect x="166" y="244" width="180" height="14" rx="7" fill="#fff" opacity="0.35"/>
+  </g>
+
+  <!-- üst blok (teal, en dar, hafif kaymış -> "perfect değil" hissi veren dinamik duruş) -->
+  <g>
+    <rect x="176" y="144" width="190" height="84" rx="18" fill="url(#blockTeal)" stroke="#0f4d46" stroke-width="10"/>
+    <rect x="196" y="158" width="150" height="14" rx="7" fill="#fff" opacity="0.35"/>
+  </g>
+
+  <!-- düşmekte olan / hareket eden küçük blok -->
+  <rect x="372" y="96" width="70" height="70" rx="16" fill="url(#blockOrange)" stroke="#7a3208" stroke-width="9" transform="rotate(8 407 131)"/>
+</svg>
